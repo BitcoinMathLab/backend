@@ -65,3 +65,12 @@ OpenAPI is available at `http://127.0.0.1:8000/api/v1/openapi.json` and interact
 The included `Dockerfile` builds a non-root, vendor-neutral service image and listens on port 8000. Deploy it behind an
 HTTPS reverse proxy, configure the platform health check to call `/api/v1/health`, and set `BML_CORS_ORIGINS` to the
 deployed frontend origin. Platforms that inject a different port can override the image command.
+
+Run the production smoke check against any deployed API origin:
+
+```bash
+python scripts/smoke_test.py --api-base-url https://api.bitcoinmathlab.com
+```
+
+The check waits for health readiness, then executes the curated valid and invalid P2PKH examples and verifies the
+versioned trace contract and correlation headers. CI runs it against the freshly built container image.

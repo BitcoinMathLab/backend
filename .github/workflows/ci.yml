@@ -31,3 +31,13 @@ jobs:
 
       - name: Build deployment image
         run: docker build --tag bitcoin-math-lab-backend:ci .
+
+      - name: Start deployment image
+        run: docker run --detach --name bml-backend-ci --publish 127.0.0.1:8000:8000 bitcoin-math-lab-backend:ci
+
+      - name: Smoke test deployment image
+        run: python scripts/smoke_test.py --api-base-url http://127.0.0.1:8000
+
+      - name: Stop deployment image
+        if: always()
+        run: docker rm --force bml-backend-ci
