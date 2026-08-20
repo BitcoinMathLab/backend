@@ -1,11 +1,15 @@
 """FastAPI application for Bitcoin Math Lab."""
 from __future__ import annotations
 
+import json
+import logging
 import os
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
+from time import perf_counter
 from urllib.parse import urlsplit
+from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -13,6 +17,10 @@ from fastapi.responses import JSONResponse
 from bml_backend import __version__
 from bml_backend.models import ErrorResponse, P2PKHTraceRequest, P2PKHTraceResponse
 from bml_backend.service import TraceRequestError, execute_p2pkh_trace
+
+
+request_logger = logging.getLogger("uvicorn.error.bml_backend.requests")
+request_logger.setLevel(logging.INFO)
 
 
 async def trace_request_error_handler(_request: Request, exc: TraceRequestError) -> JSONResponse:
@@ -40,6 +48,60 @@ async def health() -> dict[str, str]:
 
 async def p2pkh_trace(request: P2PKHTraceRequest) -> P2PKHTraceResponse:
     return execute_p2pkh_trace(request)
+
+
+async def observe_request(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Attach a correlation ID and emit a body-free structured request record."""
+    request_id = uuid4().hex
+    started = perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        duration_ms = round((perf_counter() - started) * 1_000, 2)
+        request_logger.error(
+            json.dumps(
+                {
+                    "event": "request_error",
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": 500,
+                    "duration_ms": duration_ms,
+                    "exception_type": type(exc).__name__,
+                },
+                separators=(",", ":"),
+            )
+        )
+        response = JSONResponse(
+            status_code=500,
+            content={
+                "error": {
+                    "code": "internal-error",
+                    "message": "The request could not be completed.",
+                },
+                "request_id": request_id,
+            },
+        )
+    else:
+        duration_ms = round((perf_counter() - started) * 1_000, 2)
+        request_logger.info(
+            json.dumps(
+                {
+                    "event": "request_complete",
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": response.status_code,
+                    "duration_ms": duration_ms,
+                },
+                separators=(",", ":"),
+            )
+        )
+
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 def parse_cors_origins(raw_origins: str) -> tuple[str, ...]:
@@ -82,7 +144,10 @@ def create_app(cors_origins: Sequence[str] | None = None) -> FastAPI:
             allow_origins=list(configured_origins),
             allow_methods=["GET", "POST", "OPTIONS"],
             allow_headers=["Content-Type"],
+            expose_headers=["X-Request-ID"],
         )
+
+    application.middleware("http")(observe_request)
 
     application.add_exception_handler(TraceRequestError, trace_request_error_handler)
     application.add_exception_handler(RequestValidationError, request_validation_error_handler)
@@ -92,7 +157,7 @@ def create_app(cors_origins: Sequence[str] | None = None) -> FastAPI:
         p2pkh_trace,
         methods=["POST"],
         response_model=P2PKHTraceResponse,
-        responses={422: {"model": ErrorResponse}},
+        responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
         tags=["traces"],
     )
     return application

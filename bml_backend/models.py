@@ -107,3 +107,4 @@ class ErrorBody(APIModel):
 
 class ErrorResponse(APIModel):
     error: ErrorBody
+    request_id: str | None = None
