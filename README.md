@@ -29,6 +29,8 @@ BML_CORS_ORIGINS=https://bitcoinmathlab.com,https://www.bitcoinmathlab.com \
 ```
 
 Wildcard origins are not accepted. Preview deployments should add only the specific preview origin being tested.
+Set `BML_RELEASE` to the deployed commit or immutable image identifier. The health endpoint exposes this public value so
+release smoke checks can reject a stale or unexpected image.
 
 Every response includes an `X-Request-ID`. The service emits one compact JSON log record containing the request ID,
 method, path, status, and duration, but never the query string or request body. Unexpected failures return a stable HTTP
@@ -69,7 +71,7 @@ deployed frontend origin. Platforms that inject a different port can override th
 Run the production smoke check against any deployed API origin:
 
 ```bash
-python scripts/smoke_test.py --api-base-url https://api.bitcoinmathlab.com
+python scripts/smoke_test.py --api-base-url https://api.bitcoinmathlab.com --expected-release <commit>
 ```
 
 The check waits for health readiness, then executes the curated valid and invalid P2PKH examples and verifies the

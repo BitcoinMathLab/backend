@@ -99,9 +99,17 @@ def validate_trace(payload: dict[str, Any], *, expected_success: bool) -> None:
         raise SmokeTestError("Trace did not execute the expected seven P2PKH steps")
 
 
-def run_smoke_test(api_base_url: str) -> None:
+def validate_release(health: dict[str, Any], expected_release: str | None) -> None:
+    if expected_release is not None and health.get("release") != expected_release:
+        raise SmokeTestError(
+            f"Expected release {expected_release!r}, received {health.get('release')!r}"
+        )
+
+
+def run_smoke_test(api_base_url: str, *, expected_release: str | None = None) -> None:
     api_base_url = api_base_url.rstrip("/")
     health = wait_until_ready(api_base_url)
+    validate_release(health, expected_release)
     trace_url = f"{api_base_url}/api/v1/traces/p2pkh"
 
     valid, valid_request_id = request_json(trace_url, payload=trace_request(TRANSACTION_HEX))
@@ -116,6 +124,7 @@ def run_smoke_test(api_base_url: str) -> None:
             {
                 "status": "passed",
                 "api_version": health.get("version"),
+                "release": health.get("release"),
                 "valid_request_id": valid_request_id,
                 "invalid_request_id": invalid_request_id,
             },
@@ -127,9 +136,10 @@ def run_smoke_test(api_base_url: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--api-base-url", required=True)
+    parser.add_argument("--expected-release")
     args = parser.parse_args()
     try:
-        run_smoke_test(args.api_base_url)
+        run_smoke_test(args.api_base_url, expected_release=args.expected_release)
     except SmokeTestError as exc:
         parser.exit(1, f"Smoke test failed: {exc}\n")
 

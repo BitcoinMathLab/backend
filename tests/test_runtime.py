@@ -4,7 +4,7 @@ import logging
 import httpx
 import pytest
 
-from bml_backend.app import create_app, parse_cors_origins
+from bml_backend.app import create_app, parse_cors_origins, parse_release_identifier
 
 
 pytestmark = pytest.mark.anyio
@@ -28,6 +28,26 @@ def test_cors_origins_are_normalized_and_deduplicated():
 def test_invalid_cors_origin_fails_at_startup(origin):
     with pytest.raises(ValueError, match="invalid origin"):
         parse_cors_origins(origin)
+
+
+def test_release_identifier_is_optional_and_validated():
+    assert parse_release_identifier("") is None
+    assert parse_release_identifier(" f816e529f834e0c ") == "f816e529f834e0c"
+    with pytest.raises(ValueError, match="safe identifier"):
+        parse_release_identifier("release with spaces")
+
+
+async def test_health_exposes_configured_release():
+    application = create_app(cors_origins=[], release="f816e529f834e0c")
+    transport = httpx.ASGITransport(app=application)
+    async with httpx.AsyncClient(transport=transport, base_url="http://api") as client:
+        response = await client.get("/api/v1/health")
+
+    assert response.json() == {
+        "status": "ok",
+        "version": "0.1.0",
+        "release": "f816e529f834e0c",
+    }
 
 
 async def test_configured_frontend_origin_can_call_api():

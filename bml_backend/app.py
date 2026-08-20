@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from collections.abc import Awaitable, Callable, Sequence
 from time import perf_counter
 from urllib.parse import urlsplit
@@ -42,8 +43,14 @@ async def request_validation_error_handler(_request: Request, _exc: RequestValid
     )
 
 
-async def health() -> dict[str, str]:
-    return {"status": "ok", "version": __version__}
+def parse_release_identifier(raw_release: str) -> str | None:
+    """Validate the public deployment identity exposed by the health endpoint."""
+    release = raw_release.strip()
+    if not release:
+        return None
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", release):
+        raise ValueError("BML_RELEASE must be a safe identifier of at most 128 characters")
+    return release
 
 
 async def p2pkh_trace(request: P2PKHTraceRequest) -> P2PKHTraceResponse:
@@ -125,7 +132,10 @@ def parse_cors_origins(raw_origins: str) -> tuple[str, ...]:
     return tuple(origins)
 
 
-def create_app(cors_origins: Sequence[str] | None = None) -> FastAPI:
+def create_app(
+    cors_origins: Sequence[str] | None = None,
+    release: str | None = None,
+) -> FastAPI:
     application = FastAPI(
         title="Bitcoin Math Lab API",
         version=__version__,
@@ -138,6 +148,16 @@ def create_app(cors_origins: Sequence[str] | None = None) -> FastAPI:
         if cors_origins is not None
         else parse_cors_origins(os.getenv("BML_CORS_ORIGINS", ""))
     )
+    configured_release = parse_release_identifier(
+        release if release is not None else os.getenv("BML_RELEASE", "")
+    )
+
+    async def configured_health() -> dict[str, str]:
+        response = {"status": "ok", "version": __version__}
+        if configured_release is not None:
+            response["release"] = configured_release
+        return response
+
     if configured_origins:
         application.add_middleware(
             CORSMiddleware,
@@ -151,7 +171,9 @@ def create_app(cors_origins: Sequence[str] | None = None) -> FastAPI:
 
     application.add_exception_handler(TraceRequestError, trace_request_error_handler)
     application.add_exception_handler(RequestValidationError, request_validation_error_handler)
-    application.add_api_route("/api/v1/health", health, methods=["GET"], tags=["system"])
+    application.add_api_route(
+        "/api/v1/health", configured_health, methods=["GET"], tags=["system"]
+    )
     application.add_api_route(
         "/api/v1/traces/p2pkh",
         p2pkh_trace,

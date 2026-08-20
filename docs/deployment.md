@@ -11,6 +11,7 @@ at least one previous image available for rollback.
 - Terminate TLS at the platform proxy and forward requests to the container over the platform's private network.
 - Set the readiness and liveness endpoint to `GET /api/v1/health`.
 - Set `BML_CORS_ORIGINS` to the exact HTTPS frontend origins, separated by commas. Never use a wildcard.
+- Set `BML_RELEASE` to the candidate commit or immutable image identifier.
 - Retain application logs long enough to correlate a reported `X-Request-ID`. Logs must remain access-controlled.
 
 The MVP API does not require a database or application secret. Do not add credentials to the image, repository, build
@@ -32,8 +33,9 @@ arguments, or command history.
 
    ```bash
    docker run --detach --name bml-backend-candidate --publish 8000:8000 \
-     --env BML_CORS_ORIGINS=https://bitcoinmathlab.com bitcoin-math-lab-backend:<commit>
-   python scripts/smoke_test.py --api-base-url http://127.0.0.1:8000
+     --env BML_CORS_ORIGINS=https://bitcoinmathlab.com --env BML_RELEASE=<commit> \
+     bitcoin-math-lab-backend:<commit>
+   python scripts/smoke_test.py --api-base-url http://127.0.0.1:8000 --expected-release <commit>
    docker rm --force bml-backend-candidate
    ```
 
@@ -44,7 +46,7 @@ arguments, or command history.
 3. Run the API contract smoke check against the public HTTPS origin:
 
    ```bash
-   python scripts/smoke_test.py --api-base-url https://api.bitcoinmathlab.com
+   python scripts/smoke_test.py --api-base-url https://api.bitcoinmathlab.com --expected-release <commit>
    ```
 
 4. Confirm a browser preflight from the production frontend origin returns that exact

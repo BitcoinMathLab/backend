@@ -1,6 +1,12 @@
 import pytest
 
-from scripts.smoke_test import SmokeTestError, TRANSACTION_HEX, trace_request, validate_trace
+from scripts.smoke_test import (
+    SmokeTestError,
+    TRANSACTION_HEX,
+    trace_request,
+    validate_release,
+    validate_trace,
+)
 
 
 def response(*, success=True, opcode_names=None):
@@ -48,3 +54,17 @@ def test_trace_validator_accepts_expected_valid_and_invalid_contracts():
 def test_trace_validator_rejects_contract_drift(payload, expected_success):
     with pytest.raises(SmokeTestError):
         validate_trace(payload, expected_success=expected_success)
+
+
+def test_release_validator_accepts_match_or_no_expectation():
+    health = {"status": "ok", "version": "0.1.0", "release": "abc123"}
+
+    validate_release(health, "abc123")
+    validate_release(health, None)
+
+
+def test_release_validator_rejects_wrong_or_missing_release():
+    with pytest.raises(SmokeTestError, match="Expected release"):
+        validate_release({"status": "ok"}, "abc123")
+    with pytest.raises(SmokeTestError, match="received 'old456'"):
+        validate_release({"status": "ok", "release": "old456"}, "abc123")
