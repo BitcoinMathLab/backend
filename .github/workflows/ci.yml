@@ -28,3 +28,6 @@ jobs:
 
       - name: Run tests
         run: python -m pytest -q
+
+      - name: Build deployment image
+        run: docker build --tag bitcoin-math-lab-backend:ci .
