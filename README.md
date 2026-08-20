@@ -18,15 +18,32 @@ allows the contract to grow toward SegWit and Taproot without changing its basic
 The endpoint returns normal script failures as HTTP 200 trace results with `success: false`. Malformed or unsupported
 requests return a stable HTTP 422 error object. Python tracebacks and exception class names are never returned.
 
+## Runtime configuration
+
+The service is safe to run without browser cross-origin access. When the frontend and API use different origins, set
+`BML_CORS_ORIGINS` to the exact comma-separated frontend origins that may call the API:
+
+```bash
+BML_CORS_ORIGINS=https://bitcoinmathlab.com,https://www.bitcoinmathlab.com \
+  .venv/bin/uvicorn bml_backend.app:app --host 0.0.0.0 --port 8000
+```
+
+Wildcard origins are not accepted. Preview deployments should add only the specific preview origin being tested.
+
 ## Local development
 
-Python 3.12 and a sibling Bitclone checkout are required:
+Python 3.12 is required. The package pins the tested Bitclone commit, so a sibling checkout is optional:
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install -e ../bitclone
 .venv/bin/python -m pip install -e '.[dev]'
 .venv/bin/uvicorn bml_backend.app:app --reload
+```
+
+For simultaneous local engine work, install the sibling checkout after installing the backend:
+
+```bash
+.venv/bin/python -m pip install -e ../bitclone
 ```
 
 OpenAPI is available at `http://127.0.0.1:8000/api/v1/openapi.json` and interactive documentation at
@@ -37,3 +54,9 @@ OpenAPI is available at `http://127.0.0.1:8000/api/v1/openapi.json` and interact
 ```bash
 .venv/bin/python -m pytest -q
 ```
+
+## Container deployment
+
+The included `Dockerfile` builds a non-root, vendor-neutral service image and listens on port 8000. Deploy it behind an
+HTTPS reverse proxy, configure the platform health check to call `/api/v1/health`, and set `BML_CORS_ORIGINS` to the
+deployed frontend origin. Platforms that inject a different port can override the image command.
