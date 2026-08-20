@@ -6,7 +6,7 @@ import argparse
 import json
 import time
 from typing import Any
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 
@@ -53,7 +53,7 @@ def request_json(
             request_id = response.headers.get("X-Request-ID", "")
     except HTTPError as exc:
         raise SmokeTestError(f"{url} returned HTTP {exc.code}") from exc
-    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+    except (OSError, json.JSONDecodeError) as exc:
         raise SmokeTestError(f"{url} did not return a JSON response") from exc
 
     if len(request_id) != 32:
