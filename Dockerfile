@@ -21,7 +21,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY --from=builder /wheels /wheels
-RUN python -m pip install --no-cache-dir --no-index --find-links=/wheels bitcoin-math-lab-backend \
+RUN python -m pip install --no-cache-dir --no-index --no-deps /wheels/*.whl \
     && rm -rf /wheels
 
 RUN useradd --create-home --uid 10001 bml
