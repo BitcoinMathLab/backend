@@ -74,3 +74,5 @@ python scripts/smoke_test.py --api-base-url https://api.bitcoinmathlab.com
 
 The check waits for health readiness, then executes the curated valid and invalid P2PKH examples and verifies the
 versioned trace contract and correlation headers. CI runs it against the freshly built container image.
+
+See the [deployment runbook](docs/deployment.md) for the release, verification, rollback, and incident checklist.
