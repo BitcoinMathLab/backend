@@ -15,12 +15,6 @@ jobs:
       - name: Check out backend
         uses: actions/checkout@v4
 
-      - name: Check out Bitclone engine
-        uses: actions/checkout@v4
-        with:
-          repository: BitcoinMathLab/bitclone
-          path: bitclone
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -30,7 +24,6 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ./bitclone
           python -m pip install -e '.[dev]'
 
       - name: Run tests
