@@ -30,6 +30,11 @@ BML_CORS_ORIGINS=https://bitcoinmathlab.com,https://www.bitcoinmathlab.com \
 
 Wildcard origins are not accepted. Preview deployments should add only the specific preview origin being tested.
 
+Every response includes an `X-Request-ID`. The service emits one compact JSON log record containing the request ID,
+method, path, status, and duration, but never the query string or request body. Unexpected failures return a stable HTTP
+500 error containing the same request ID, allowing an operator to correlate a browser report without exposing internal
+exception messages.
+
 ## Local development
 
 Python 3.12 is required. The package pins the tested Bitclone commit, so a sibling checkout is optional:
