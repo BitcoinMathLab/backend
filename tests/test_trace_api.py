@@ -103,7 +103,7 @@ async def test_request_validation_has_stable_safe_shape():
     assert response.json() == {
         "error": {
             "code": "request-validation",
-            "message": "The request body does not match the v1 trace contract.",
+            "message": "The request does not match the v1 API contract.",
         }
     }
 

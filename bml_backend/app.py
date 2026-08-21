@@ -16,12 +16,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from bml_backend import __version__
-from bml_backend.models import ErrorResponse, P2PKHTraceRequest, P2PKHTraceResponse
+from bml_backend.bitcoin_core import TransactionContextSource, TransactionSourceError
+from bml_backend.config import transaction_source_from_environment
+from bml_backend.models import (
+    ErrorResponse,
+    P2PKHTraceRequest,
+    P2PKHTraceResponse,
+    PreviousOutputResponse,
+    TransactionContextResponse,
+)
 from bml_backend.service import TraceRequestError, execute_p2pkh_trace
 
 
 request_logger = logging.getLogger("uvicorn.error.bml_backend.requests")
 request_logger.setLevel(logging.INFO)
+_ENVIRONMENT_SOURCE = object()
 
 
 async def trace_request_error_handler(_request: Request, exc: TraceRequestError) -> JSONResponse:
@@ -37,9 +46,25 @@ async def request_validation_error_handler(_request: Request, _exc: RequestValid
         content={
             "error": {
                 "code": "request-validation",
-                "message": "The request body does not match the v1 trace contract.",
+                "message": "The request does not match the v1 API contract.",
             }
         },
+    )
+
+
+async def transaction_source_error_handler(
+    _request: Request, exc: TransactionSourceError
+) -> JSONResponse:
+    status_code = {
+        "invalid-txid": 422,
+        "bitcoin-core-not-configured": 503,
+        "bitcoin-core-unavailable": 503,
+        "invalid-source-data": 502,
+        "previous-output-missing": 502,
+    }.get(exc.code, 502)
+    return JSONResponse(
+        status_code=status_code,
+        content={"error": {"code": exc.code, "message": exc.message}},
     )
 
 
@@ -135,6 +160,7 @@ def parse_cors_origins(raw_origins: str) -> tuple[str, ...]:
 def create_app(
     cors_origins: Sequence[str] | None = None,
     release: str | None = None,
+    transaction_source: TransactionContextSource | None | object = _ENVIRONMENT_SOURCE,
 ) -> FastAPI:
     application = FastAPI(
         title="Bitcoin Math Lab API",
@@ -151,12 +177,39 @@ def create_app(
     configured_release = parse_release_identifier(
         release if release is not None else os.getenv("BML_RELEASE", "")
     )
+    configured_transaction_source = (
+        transaction_source_from_environment()
+        if transaction_source is _ENVIRONMENT_SOURCE
+        else transaction_source
+    )
 
     async def configured_health() -> dict[str, str]:
         response = {"status": "ok", "version": __version__}
         if configured_release is not None:
             response["release"] = configured_release
         return response
+
+    def configured_transaction_context(txid: str) -> TransactionContextResponse:
+        if configured_transaction_source is None:
+            raise TransactionSourceError(
+                "bitcoin-core-not-configured",
+                "Bitcoin Core transaction lookup is not configured.",
+            )
+        context = configured_transaction_source.load_context(txid)
+        return TransactionContextResponse(
+            txid=context.txid,
+            transaction_hex=context.transaction_hex,
+            is_coinbase=context.is_coinbase,
+            spent_outputs=[
+                PreviousOutputResponse(
+                    txid=output.txid,
+                    vout=output.vout,
+                    amount_sats=output.amount_sats,
+                    script_pubkey_hex=output.script_pubkey_hex,
+                )
+                for output in context.spent_outputs
+            ],
+        )
 
     if configured_origins:
         application.add_middleware(
@@ -170,6 +223,7 @@ def create_app(
     application.middleware("http")(observe_request)
 
     application.add_exception_handler(TraceRequestError, trace_request_error_handler)
+    application.add_exception_handler(TransactionSourceError, transaction_source_error_handler)
     application.add_exception_handler(RequestValidationError, request_validation_error_handler)
     application.add_api_route(
         "/api/v1/health", configured_health, methods=["GET"], tags=["system"]
@@ -181,6 +235,18 @@ def create_app(
         response_model=P2PKHTraceResponse,
         responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
         tags=["traces"],
+    )
+    application.add_api_route(
+        "/api/v1/transactions/{txid}/context",
+        configured_transaction_context,
+        methods=["GET"],
+        response_model=TransactionContextResponse,
+        responses={
+            422: {"model": ErrorResponse},
+            502: {"model": ErrorResponse},
+            503: {"model": ErrorResponse},
+        },
+        tags=["transactions"],
     )
     return application
 

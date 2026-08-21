@@ -28,6 +28,10 @@ class TransactionContext:
     spent_outputs: tuple[SpentOutputContext, ...]
 
 
+class TransactionContextSource(Protocol):
+    def load_context(self, txid: str) -> TransactionContext: ...
+
+
 class TransactionSourceError(Exception):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)

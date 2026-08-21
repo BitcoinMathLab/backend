@@ -100,6 +100,21 @@ class P2PKHTraceResponse(APIModel):
     trace: ExecutionTraceResponse
 
 
+class PreviousOutputResponse(APIModel):
+    txid: str = Field(pattern=r"^[0-9a-f]{64}$")
+    vout: int = Field(ge=0, le=0xFFFFFFFF)
+    amount_sats: int = Field(ge=0, le=2_100_000_000_000_000)
+    script_pubkey_hex: str = Field(pattern=r"^(?:[0-9a-f]{2})*$", max_length=20_000)
+
+
+class TransactionContextResponse(APIModel):
+    api_version: Literal["v1"] = "v1"
+    txid: str = Field(pattern=r"^[0-9a-f]{64}$")
+    transaction_hex: HexString = Field(max_length=800_000)
+    is_coinbase: bool
+    spent_outputs: list[PreviousOutputResponse]
+
+
 class ErrorBody(APIModel):
     code: str
     message: str
