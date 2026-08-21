@@ -18,6 +18,31 @@ allows the contract to grow toward SegWit and Taproot without changing its basic
 The endpoint returns normal script failures as HTTP 200 trace results with `success: false`. Malformed or unsupported
 requests return a stable HTTP 422 error object. Python tracebacks and exception class names are never returned.
 
+## Story 11.1 — Bitcoin Core transaction context
+
+When a local Bitcoin Core source is configured, the backend can load a real transaction and the previous output spent
+by each input:
+
+```text
+GET /api/v1/transactions/{txid}/context
+```
+
+For local development through Bitclone's SSH tunnel, start the tunnel and backend with:
+
+```bash
+cd ../bitclone
+./.venv/bin/python startup.py
+cd ../backend
+BML_CORE_RPC_URL=http://127.0.0.1:18332 \
+  BML_CORE_RPC_COOKIE=~/.bitclone/skyscraper.cookie \
+  .venv/bin/uvicorn bml_backend.app:app --reload
+```
+
+The Core node must have a synchronized transaction index for arbitrary historical txid lookup. When Core is absent or
+still indexing, the endpoint returns a stable HTTP 503 response instead of exposing RPC details. Username/password RPC
+authentication is also supported through `BML_CORE_RPC_USER` and `BML_CORE_RPC_PASSWORD`; credentials must never be
+placed in the RPC URL or committed to the repository. `BML_CORE_RPC_TIMEOUT` defaults to 10 seconds.
+
 ## Runtime configuration
 
 The service is safe to run without browser cross-origin access. When the frontend and API use different origins, set
@@ -71,7 +96,7 @@ deployed frontend origin. Platforms that inject a different port can override th
 Run the production smoke check against any deployed API origin:
 
 ```bash
-python scripts/smoke_test.py --api-base-url https://api.bitcoinmathlab.com --expected-release <commit>
+python scripts/smoke_test.py --api-base-url https://api.btcmathlab.com --expected-release <commit>
 ```
 
 The check waits for health readiness, then executes the curated valid and invalid P2PKH examples and verifies the

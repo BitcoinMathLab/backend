@@ -46,7 +46,7 @@ arguments, or command history.
 3. Run the API contract smoke check against the public HTTPS origin:
 
    ```bash
-   python scripts/smoke_test.py --api-base-url https://api.bitcoinmathlab.com --expected-release <commit>
+   python scripts/smoke_test.py --api-base-url https://api.btcmathlab.com --expected-release <commit>
    ```
 
 4. Confirm a browser preflight from the production frontend origin returns that exact
