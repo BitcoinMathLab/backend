@@ -134,7 +134,11 @@ class TransactionOutputResponse(APIModel):
 class TransactionContextResponse(APIModel):
     api_version: Literal["v1"] = "v1"
     txid: str = Field(pattern=r"^[0-9a-f]{64}$")
+    wtxid: str = Field(pattern=r"^[0-9a-f]{64}$")
     transaction_hex: HexString = Field(max_length=800_000)
+    version: int = Field(ge=0, le=0xFFFFFFFF)
+    locktime: int = Field(ge=0, le=0xFFFFFFFF)
+    is_segwit: bool
     is_coinbase: bool
     outputs: list[TransactionOutputResponse]
     spent_outputs: list[PreviousOutputResponse]

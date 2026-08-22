@@ -9,7 +9,11 @@ ordered previous-output context required to analyze its inputs.
 {
   "api_version": "v1",
   "txid": "<64 lowercase hex characters>",
+  "wtxid": "<64 lowercase hex characters>",
   "transaction_hex": "<canonical serialized transaction>",
+  "version": 2,
+  "locktime": 0,
+  "is_segwit": true,
   "is_coinbase": false,
   "outputs": [
     {
@@ -36,6 +40,9 @@ ordered previous-output context required to analyze its inputs.
 `outputs` contains every output created by the transaction in `vout` order. Previous outputs appear in the same order
 as the transaction inputs. Repeated inputs from one previous transaction use one Core lookup. Coinbase transactions
 return `is_coinbase: true` and an empty `spent_outputs` array while still returning their created outputs.
+
+`version`, `locktime`, and `is_segwit` decode the transaction header/serialization format. `wtxid` equals `txid` for
+legacy transactions and identifies the witness-inclusive serialization for SegWit transactions.
 
 Bitcoin Core intentionally excludes the genesis-block coinbase from `getrawtransaction`. For that exact txid, the
 adapter retrieves and verifies block zero, extracts its sole coinbase transaction, and returns the same normal coinbase
