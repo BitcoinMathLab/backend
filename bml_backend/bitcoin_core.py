@@ -109,7 +109,7 @@ class BitcoinCoreTransactionSource:
                 spent_outputs=(),
                 size_bytes=len(transaction.to_bytes()),
                 weight_units=transaction.wu,
-                virtual_size_vbytes=transaction.vbytes,
+                virtual_size_vbytes=(transaction.wu + 3) // 4,
             )
 
         previous_transactions: dict[str, Tx] = {}
@@ -171,7 +171,7 @@ class BitcoinCoreTransactionSource:
             spent_outputs=tuple(spent_outputs),
             size_bytes=len(transaction.to_bytes()),
             weight_units=transaction.wu,
-            virtual_size_vbytes=transaction.vbytes,
+            virtual_size_vbytes=(transaction.wu + 3) // 4,
         )
 
     def _load_transaction(self, txid: str) -> Tx:
