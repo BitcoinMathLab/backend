@@ -18,6 +18,9 @@ ordered previous-output context required to analyze its inputs.
   "total_input_sats": 1000010000,
   "total_output_sats": 1000000000,
   "fee_sats": 10000,
+  "size_bytes": 223,
+  "weight_units": 562,
+  "virtual_size_vbytes": 141,
   "outputs": [
     {
       "vout": 0,
@@ -52,6 +55,8 @@ legacy transactions and identifies the witness-inclusive serialization for SegWi
 `total_input_sats` sums the resolved previous outputs, `total_output_sats` sums the newly created outputs, and
 `fee_sats` is their difference. Coinbase transactions report zero input sats and `fee_sats: null` because their output
 value is a block subsidy plus fees rather than a transaction fee calculation.
+
+`size_bytes`, `weight_units`, and `virtual_size_vbytes` expose the serialized size and SegWit-aware resource metrics.
 
 Bitcoin Core intentionally excludes the genesis-block coinbase from `getrawtransaction`. For that exact txid, the
 adapter retrieves and verifies block zero, extracts its sole coinbase transaction, and returns the same normal coinbase

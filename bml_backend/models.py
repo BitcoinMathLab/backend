@@ -144,6 +144,9 @@ class TransactionContextResponse(APIModel):
     total_input_sats: int = Field(ge=0, le=2_100_000_000_000_000)
     total_output_sats: int = Field(ge=0, le=2_100_000_000_000_000)
     fee_sats: int | None = Field(default=None, ge=0, le=2_100_000_000_000_000)
+    size_bytes: int = Field(ge=0, le=4_000_000)
+    weight_units: int = Field(ge=0, le=4_000_000)
+    virtual_size_vbytes: int = Field(ge=0, le=1_000_000)
     outputs: list[TransactionOutputResponse]
     spent_outputs: list[PreviousOutputResponse]
 

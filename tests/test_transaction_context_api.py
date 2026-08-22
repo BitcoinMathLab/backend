@@ -68,6 +68,9 @@ async def test_returns_versioned_transaction_and_spent_output_context():
                     spend_type="P2PKH",
                 ),
             ),
+            size_bytes=225,
+            weight_units=900,
+            virtual_size_vbytes=225,
         )
     )
     response = await request(create_app(cors_origins=[], transaction_source=source))
@@ -85,6 +88,9 @@ async def test_returns_versioned_transaction_and_spent_output_context():
         "total_input_sats": 60_000,
         "total_output_sats": 54_321,
         "fee_sats": 5_679,
+        "size_bytes": 225,
+        "weight_units": 900,
+        "virtual_size_vbytes": 225,
         "outputs": [
             {
                 "vout": 0,

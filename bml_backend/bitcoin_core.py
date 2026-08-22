@@ -52,6 +52,9 @@ class TransactionContext:
     is_coinbase: bool
     outputs: tuple[TransactionOutputContext, ...]
     spent_outputs: tuple[SpentOutputContext, ...]
+    size_bytes: int = 0
+    weight_units: int = 0
+    virtual_size_vbytes: int = 0
 
 
 class TransactionContextSource(Protocol):
@@ -104,6 +107,9 @@ class BitcoinCoreTransactionSource:
                 is_coinbase=True,
                 outputs=outputs,
                 spent_outputs=(),
+                size_bytes=len(transaction.to_bytes()),
+                weight_units=transaction.wu,
+                virtual_size_vbytes=transaction.vbytes,
             )
 
         previous_transactions: dict[str, Tx] = {}
@@ -163,6 +169,9 @@ class BitcoinCoreTransactionSource:
             is_coinbase=False,
             outputs=outputs,
             spent_outputs=tuple(spent_outputs),
+            size_bytes=len(transaction.to_bytes()),
+            weight_units=transaction.wu,
+            virtual_size_vbytes=transaction.vbytes,
         )
 
     def _load_transaction(self, txid: str) -> Tx:
