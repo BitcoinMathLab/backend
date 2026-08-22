@@ -83,6 +83,9 @@ def test_loads_transaction_and_ordered_previous_output_context():
     assert context.version == target.version
     assert context.locktime == target.locktime
     assert context.is_segwit is False
+    assert context.size_bytes == len(target.to_bytes())
+    assert context.weight_units == target.wu
+    assert context.virtual_size_vbytes == target.vbytes
     assert context.is_coinbase is False
     assert [
         (output.vout, output.amount_sats, output.script_pubkey_hex, output.output_type)
@@ -126,6 +129,9 @@ def test_aligns_witnesses_with_inputs_to_classify_taproot_paths():
     assert context.is_segwit is True
     assert context.wtxid == target.wtxid[::-1].hex()
     assert context.wtxid != context.txid
+    assert context.size_bytes == len(target.to_bytes())
+    assert context.weight_units == target.wu
+    assert context.virtual_size_vbytes == target.vbytes
     assert [output.spend_type for output in context.spent_outputs] == [
         "P2TR-KEY-PATH",
         "P2WPKH",

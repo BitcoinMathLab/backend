@@ -251,6 +251,9 @@ def create_app(
             total_input_sats=total_input_sats,
             total_output_sats=total_output_sats,
             fee_sats=None if context.is_coinbase else total_input_sats - total_output_sats,
+            size_bytes=context.size_bytes,
+            weight_units=context.weight_units,
+            virtual_size_vbytes=context.virtual_size_vbytes,
             outputs=[
                 TransactionOutputResponse(
                     vout=output.vout,
