@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from src.database.bitcoin_core_rpc import BitcoinCoreRPCError
+from src.script import classify_spend
 from src.tx import Tx
 
 
@@ -18,6 +19,10 @@ class SpentOutputContext:
     vout: int
     amount_sats: int
     script_pubkey_hex: str
+    output_type: str | None = None
+    spend_type: str = "UNKNOWN"
+    is_nested: bool = False
+    redeem_script_hex: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +68,7 @@ class BitcoinCoreTransactionSource:
 
         previous_transactions: dict[str, Tx] = {}
         spent_outputs: list[SpentOutputContext] = []
-        for transaction_input in transaction.inputs:
+        for input_index, transaction_input in enumerate(transaction.inputs):
             previous_txid = transaction_input.txid[::-1].hex()
             previous = previous_transactions.get(previous_txid)
             if previous is None:
@@ -77,12 +82,34 @@ class BitcoinCoreTransactionSource:
                 )
 
             output = previous.outputs[transaction_input.vout]
+            witness = (
+                transaction.witness[input_index].items
+                if input_index < len(transaction.witness)
+                else ()
+            )
+            classification = classify_spend(
+                output.scriptpubkey,
+                script_sig=transaction_input.scriptsig,
+                witness=witness,
+            )
             spent_outputs.append(
                 SpentOutputContext(
                     txid=previous_txid,
                     vout=transaction_input.vout,
                     amount_sats=output.amount,
                     script_pubkey_hex=output.scriptpubkey.hex(),
+                    output_type=(
+                        classification.output_type.value
+                        if classification.output_type is not None
+                        else None
+                    ),
+                    spend_type=classification.spend_type.value,
+                    is_nested=classification.is_nested,
+                    redeem_script_hex=(
+                        classification.redeem_script.hex()
+                        if classification.redeem_script is not None
+                        else None
+                    ),
                 )
             )
 

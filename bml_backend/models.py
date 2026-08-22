@@ -105,6 +105,23 @@ class PreviousOutputResponse(APIModel):
     vout: int = Field(ge=0, le=0xFFFFFFFF)
     amount_sats: int = Field(ge=0, le=2_100_000_000_000_000)
     script_pubkey_hex: str = Field(pattern=r"^(?:[0-9a-f]{2})*$", max_length=20_000)
+    output_type: Literal["P2PK", "P2PKH", "P2MS", "P2SH", "P2WPKH", "P2WSH", "P2TR"] | None
+    spend_type: Literal[
+        "P2PK",
+        "P2PKH",
+        "P2SH",
+        "P2SH-P2WPKH",
+        "P2SH-P2WSH",
+        "P2WPKH",
+        "P2WSH",
+        "P2TR-KEY-PATH",
+        "P2TR-SCRIPT-PATH",
+        "UNKNOWN",
+    ]
+    is_nested: bool
+    redeem_script_hex: str | None = Field(
+        default=None, pattern=r"^(?:[0-9a-f]{2})+$", max_length=20_000
+    )
 
 
 class TransactionContextResponse(APIModel):

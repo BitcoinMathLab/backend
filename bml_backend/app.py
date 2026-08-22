@@ -206,6 +206,10 @@ def create_app(
                     vout=output.vout,
                     amount_sats=output.amount_sats,
                     script_pubkey_hex=output.script_pubkey_hex,
+                    output_type=output.output_type,
+                    spend_type=output.spend_type,
+                    is_nested=output.is_nested,
+                    redeem_script_hex=output.redeem_script_hex,
                 )
                 for output in context.spent_outputs
             ],

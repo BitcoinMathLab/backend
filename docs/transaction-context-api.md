@@ -16,7 +16,11 @@ ordered previous-output context required to analyze its inputs.
       "txid": "<previous transaction id>",
       "vout": 0,
       "amount_sats": 1000,
-      "script_pubkey_hex": "<locking script>"
+      "script_pubkey_hex": "<locking script>",
+      "output_type": "P2WPKH",
+      "spend_type": "P2WPKH",
+      "is_nested": false,
+      "redeem_script_hex": null
     }
   ]
 }
@@ -24,6 +28,10 @@ ordered previous-output context required to analyze its inputs.
 
 Previous outputs appear in the same order as the transaction inputs. Repeated inputs from one previous transaction use
 one Core lookup. Coinbase transactions return `is_coinbase: true` and an empty `spent_outputs` array.
+
+`output_type` describes the previous output's locking-script family. `spend_type` additionally distinguishes nested
+P2SH-SegWit and Taproot key/script paths using the spending input. Unsupported or structurally ambiguous data is
+reported as `UNKNOWN`; classification does not replace full script or transaction validation.
 
 ## Stable errors
 
@@ -39,9 +47,9 @@ Core connection details and credentials are never included in these responses.
 
 ## QA validation
 
-Automated validation uses a fake Core boundary and covers ordered outputs, duplicate lookup caching, coinbase context,
-invalid txids, unavailable Core, malformed source bytes, missing outputs, API response shape, stable HTTP mappings, and
-OpenAPI publication.
+Automated validation uses a fake Core boundary and covers ordered outputs, duplicate lookup caching, witness-to-input
+alignment, spend classification, coinbase context, invalid txids, unavailable Core, malformed source bytes, missing
+outputs, API response shape, stable HTTP mappings, and OpenAPI publication.
 
 Manual validation requires a synchronized, unpruned Bitcoin Core node with `txindex=1`:
 
@@ -49,7 +57,8 @@ Manual validation requires a synchronized, unpruned Bitcoin Core node with `txin
 2. Start the backend with `BML_CORE_RPC_URL` and `BML_CORE_RPC_COOKIE` as shown in the README.
 3. Request
    `/api/v1/transactions/40e331b67c0fe7750bb3b1943b378bf702dce86124dc12fa5980f975db7ec930/context`.
-4. Expect HTTP 200, the same txid, one spent output, and `amount_sats: 82974043165`.
+4. Expect HTTP 200, the same txid, one spent output, `amount_sats: 82974043165`, and classification fields matching
+   that input's previous output and spend path.
 5. Request a malformed txid and expect a safe 422 response.
 6. Stop the tunnel, retry the known txid, and expect a safe 503 response with an `X-Request-ID` header.
 

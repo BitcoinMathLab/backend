@@ -50,7 +50,9 @@ async def test_returns_versioned_transaction_and_spent_output_context():
                     txid=PREVIOUS_TXID,
                     vout=1,
                     amount_sats=12_345,
-                    script_pubkey_hex="51",
+                    script_pubkey_hex="76a914" + "33" * 20 + "88ac",
+                    output_type="P2PKH",
+                    spend_type="P2PKH",
                 ),
             ),
         )
@@ -68,7 +70,11 @@ async def test_returns_versioned_transaction_and_spent_output_context():
                 "txid": PREVIOUS_TXID,
                 "vout": 1,
                 "amount_sats": 12_345,
-                "script_pubkey_hex": "51",
+                "script_pubkey_hex": "76a914" + "33" * 20 + "88ac",
+                "output_type": "P2PKH",
+                "spend_type": "P2PKH",
+                "is_nested": False,
+                "redeem_script_hex": None,
             }
         ],
     }

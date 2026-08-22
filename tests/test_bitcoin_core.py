@@ -2,7 +2,7 @@ from collections import Counter
 
 import pytest
 from src.database.bitcoin_core_rpc import BitcoinCoreRPCError
-from src.tx import Tx, TxIn, TxOut
+from src.tx import Tx, TxIn, TxOut, Witness
 
 from bml_backend.bitcoin_core import BitcoinCoreTransactionSource, TransactionSourceError
 
@@ -63,14 +63,44 @@ def test_loads_transaction_and_ordered_previous_output_context():
     assert context.transaction_hex == transaction_hex(target)
     assert context.is_coinbase is False
     actual_outputs = [
-        (output.vout, output.amount_sats, output.script_pubkey_hex)
+        (output.vout, output.amount_sats, output.script_pubkey_hex, output.spend_type)
         for output in context.spent_outputs
     ]
     assert actual_outputs == [
-        (1, 2_500, "76a914" + "11" * 20 + "88ac"),
-        (0, 1_500, "51"),
+        (1, 2_500, "76a914" + "11" * 20 + "88ac", "P2PKH"),
+        (0, 1_500, "51", "UNKNOWN"),
     ]
     assert client.calls[display_txid(previous)] == 1
+
+
+def test_aligns_witnesses_with_inputs_to_classify_taproot_paths():
+    previous = coinbase_transaction(
+        [
+            TxOut(2_500, bytes.fromhex("5120" + "11" * 32)),
+            TxOut(3_500, bytes.fromhex("0014" + "22" * 20)),
+        ]
+    )
+    target = Tx(
+        inputs=[
+            TxIn(previous.txid, 0, b"", 0xFFFFFFFE),
+            TxIn(previous.txid, 1, b"", 0xFFFFFFFD),
+        ],
+        outputs=[TxOut(5_000, bytes.fromhex("51"))],
+        witness=[Witness([b"\x33" * 64]), Witness([b"signature", b"public key"])],
+    )
+    client = FakeBitcoinCore(
+        {
+            display_txid(target): transaction_hex(target),
+            display_txid(previous): transaction_hex(previous),
+        }
+    )
+
+    context = BitcoinCoreTransactionSource(client).load_context(display_txid(target))
+
+    assert [output.spend_type for output in context.spent_outputs] == [
+        "P2TR-KEY-PATH",
+        "P2WPKH",
+    ]
 
 
 def test_coinbase_context_has_no_previous_outputs():
