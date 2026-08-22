@@ -43,7 +43,11 @@ class TransactionOutputContext:
 @dataclass(frozen=True, slots=True)
 class TransactionContext:
     txid: str
+    wtxid: str
     transaction_hex: str
+    version: int
+    locktime: int
+    is_segwit: bool
     is_coinbase: bool
     outputs: tuple[TransactionOutputContext, ...]
     spent_outputs: tuple[SpentOutputContext, ...]
@@ -85,7 +89,11 @@ class BitcoinCoreTransactionSource:
         if transaction.is_coinbase:
             return TransactionContext(
                 txid=normalized_txid,
+                wtxid=transaction.wtxid[::-1].hex(),
                 transaction_hex=transaction_hex,
+                version=transaction.version,
+                locktime=transaction.locktime,
+                is_segwit=transaction.is_segwit,
                 is_coinbase=True,
                 outputs=outputs,
                 spent_outputs=(),
@@ -140,7 +148,11 @@ class BitcoinCoreTransactionSource:
 
         return TransactionContext(
             txid=normalized_txid,
+            wtxid=transaction.wtxid[::-1].hex(),
             transaction_hex=transaction_hex,
+            version=transaction.version,
+            locktime=transaction.locktime,
+            is_segwit=transaction.is_segwit,
             is_coinbase=False,
             outputs=outputs,
             spent_outputs=tuple(spent_outputs),

@@ -44,7 +44,11 @@ async def test_returns_versioned_transaction_and_spent_output_context():
     source = FakeTransactionSource(
         TransactionContext(
             txid=TXID,
+            wtxid=TXID,
             transaction_hex="01000000000100",
+            version=1,
+            locktime=0,
+            is_segwit=False,
             is_coinbase=False,
             outputs=(
                 TransactionOutputContext(
@@ -71,7 +75,11 @@ async def test_returns_versioned_transaction_and_spent_output_context():
     assert response.json() == {
         "api_version": "v1",
         "txid": TXID,
+        "wtxid": TXID,
         "transaction_hex": "01000000000100",
+        "version": 1,
+        "locktime": 0,
+        "is_segwit": False,
         "is_coinbase": False,
         "outputs": [
             {

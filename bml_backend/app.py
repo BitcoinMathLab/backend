@@ -240,7 +240,11 @@ def create_app(
         context = configured_transaction_source.load_context(txid)
         return TransactionContextResponse(
             txid=context.txid,
+            wtxid=context.wtxid,
             transaction_hex=context.transaction_hex,
+            version=context.version,
+            locktime=context.locktime,
+            is_segwit=context.is_segwit,
             is_coinbase=context.is_coinbase,
             outputs=[
                 TransactionOutputResponse(
