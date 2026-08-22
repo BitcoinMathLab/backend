@@ -5,6 +5,7 @@ from bml_backend.app import create_app
 from bml_backend.bitcoin_core import (
     SpentOutputContext,
     TransactionContext,
+    TransactionOutputContext,
     TransactionSourceError,
 )
 
@@ -45,6 +46,13 @@ async def test_returns_versioned_transaction_and_spent_output_context():
             txid=TXID,
             transaction_hex="01000000000100",
             is_coinbase=False,
+            outputs=(
+                TransactionOutputContext(
+                    vout=0,
+                    amount_sats=54_321,
+                    script_pubkey_hex="52",
+                ),
+            ),
             spent_outputs=(
                 SpentOutputContext(
                     txid=PREVIOUS_TXID,
@@ -63,6 +71,13 @@ async def test_returns_versioned_transaction_and_spent_output_context():
         "txid": TXID,
         "transaction_hex": "01000000000100",
         "is_coinbase": False,
+        "outputs": [
+            {
+                "vout": 0,
+                "amount_sats": 54_321,
+                "script_pubkey_hex": "52",
+            }
+        ],
         "spent_outputs": [
             {
                 "txid": PREVIOUS_TXID,
