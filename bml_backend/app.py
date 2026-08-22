@@ -24,9 +24,12 @@ from bml_backend.models import (
     P2PKHTraceResponse,
     PreviousOutputResponse,
     TransactionContextResponse,
+    TransactionExampleResponse,
+    TransactionExamplesResponse,
     TransactionOutputResponse,
 )
 from bml_backend.service import TraceRequestError, execute_p2pkh_trace
+from bml_backend.transaction_examples import TRANSACTION_EXAMPLES
 
 
 request_logger = logging.getLogger("uvicorn.error.bml_backend.requests")
@@ -190,6 +193,23 @@ def create_app(
             response["release"] = configured_release
         return response
 
+    def transaction_examples() -> TransactionExamplesResponse:
+        return TransactionExamplesResponse(
+            examples=[
+                TransactionExampleResponse(
+                    slug=example.slug,
+                    title=example.title,
+                    description=example.description,
+                    txid=example.txid,
+                    input_count=example.input_count,
+                    output_count=example.output_count,
+                    expected_spend_types=list(example.expected_spend_types),
+                    concepts=list(example.concepts),
+                )
+                for example in TRANSACTION_EXAMPLES
+            ]
+        )
+
     def configured_transaction_context(txid: str) -> TransactionContextResponse:
         if configured_transaction_source is None:
             raise TransactionSourceError(
@@ -248,6 +268,13 @@ def create_app(
         response_model=P2PKHTraceResponse,
         responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
         tags=["traces"],
+    )
+    application.add_api_route(
+        "/api/v1/transactions/examples",
+        transaction_examples,
+        methods=["GET"],
+        response_model=TransactionExamplesResponse,
+        tags=["transactions"],
     )
     application.add_api_route(
         "/api/v1/transactions/{txid}/context",
