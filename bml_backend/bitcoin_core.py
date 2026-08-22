@@ -4,12 +4,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from src.block import Block
 from src.database.bitcoin_core_rpc import BitcoinCoreRPCError
 from src.tx import Tx
 
 
+GENESIS_TXID = "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"
+
+
 class BitcoinCoreClient(Protocol):
     def get_raw_transaction(self, display_txid: str, verbose: bool = False): ...
+
+    def get_block_hash(self, height: int) -> bytes: ...
+
+    def get_block(self, block_hash: bytes) -> bytes: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +105,8 @@ class BitcoinCoreTransactionSource:
         try:
             raw_hex = self._client.get_raw_transaction(txid, False)
         except BitcoinCoreRPCError as exc:
+            if txid == GENESIS_TXID:
+                return self._load_genesis_transaction()
             raise TransactionSourceError(
                 "bitcoin-core-unavailable",
                 "Bitcoin Core could not provide the requested transaction.",
@@ -122,6 +132,35 @@ class BitcoinCoreTransactionSource:
                 "Bitcoin Core returned transaction data that does not match the requested txid.",
             )
         return transaction
+
+    def _load_genesis_transaction(self) -> Tx:
+        """Load block zero because Core excludes its coinbase from getrawtransaction."""
+        try:
+            block_hash = self._client.get_block_hash(0)
+            raw_block = self._client.get_block(block_hash)
+            block = Block.from_bytes(raw_block)
+        except BitcoinCoreRPCError as exc:
+            raise TransactionSourceError(
+                "bitcoin-core-unavailable",
+                "Bitcoin Core could not provide the requested transaction.",
+            ) from exc
+        except Exception as exc:
+            raise TransactionSourceError(
+                "invalid-source-data",
+                "Bitcoin Core returned invalid genesis block data.",
+            ) from exc
+
+        if (
+            block.to_bytes() != raw_block
+            or block.block_id != block_hash
+            or len(block.txs) != 1
+            or block.txs[0].txid[::-1].hex() != GENESIS_TXID
+        ):
+            raise TransactionSourceError(
+                "invalid-source-data",
+                "Bitcoin Core returned invalid genesis block data.",
+            )
+        return block.txs[0]
 
 
 def _normalize_txid(txid: str) -> str:

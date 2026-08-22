@@ -25,6 +25,10 @@ ordered previous-output context required to analyze its inputs.
 Previous outputs appear in the same order as the transaction inputs. Repeated inputs from one previous transaction use
 one Core lookup. Coinbase transactions return `is_coinbase: true` and an empty `spent_outputs` array.
 
+Bitcoin Core intentionally excludes the genesis-block coinbase from `getrawtransaction`. For that exact txid, the
+adapter retrieves and verifies block zero, extracts its sole coinbase transaction, and returns the same normal coinbase
+context shape. No other failed transaction lookup uses this fallback.
+
 ## Stable errors
 
 | HTTP | Code | Meaning |
@@ -52,6 +56,8 @@ Manual validation requires a synchronized, unpruned Bitcoin Core node with `txin
 4. Expect HTTP 200, the same txid, one spent output, and `amount_sats: 82974043165`.
 5. Request a malformed txid and expect a safe 422 response.
 6. Stop the tunnel, retry the known txid, and expect a safe 503 response with an `X-Request-ID` header.
+7. Request `4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b`. Expect HTTP 200,
+   `is_coinbase: true`, and no previous outputs.
 
-The live success case remains deferred while the development Core node builds its transaction index. Tunnel operation,
-cookie authentication, and the safe unavailable response have already passed manual QA.
+The live ordinary-transaction and genesis-coinbase success cases, tunnel operation, cookie authentication, and the safe
+unavailable response have passed manual QA against the development Core node.
