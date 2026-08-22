@@ -20,3 +20,10 @@ and native P2WSH. Its expected shapes and classifications were verified against 
 2. Select each txid and request its transaction context with Core running.
 3. Confirm the returned input/output counts and spend classifications match the catalog.
 4. Confirm no duplicate slugs or txids appear.
+
+With the RPC environment configured, run:
+
+    ./.venv/bin/python -m bml_backend.verify_transaction_examples
+
+The command loads every example through the same adapter used by the public context API and rejects txid, shape, or
+spend-classification drift.
