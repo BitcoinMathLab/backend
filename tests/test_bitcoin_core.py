@@ -80,6 +80,10 @@ def test_loads_transaction_and_ordered_previous_output_context():
     assert context.txid == display_txid(target)
     assert context.transaction_hex == transaction_hex(target)
     assert context.is_coinbase is False
+    assert [
+        (output.vout, output.amount_sats, output.script_pubkey_hex)
+        for output in context.outputs
+    ] == [(0, 3_500, "51")]
     actual_outputs = [
         (output.vout, output.amount_sats, output.script_pubkey_hex)
         for output in context.spent_outputs
@@ -98,6 +102,10 @@ def test_coinbase_context_has_no_previous_outputs():
     context = BitcoinCoreTransactionSource(client).load_context(display_txid(coinbase))
 
     assert context.is_coinbase is True
+    assert [
+        (output.vout, output.amount_sats, output.script_pubkey_hex)
+        for output in context.outputs
+    ] == [(0, 5_000_000_000, "51")]
     assert context.spent_outputs == ()
 
 

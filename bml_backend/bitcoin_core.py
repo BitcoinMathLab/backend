@@ -29,10 +29,18 @@ class SpentOutputContext:
 
 
 @dataclass(frozen=True, slots=True)
+class TransactionOutputContext:
+    vout: int
+    amount_sats: int
+    script_pubkey_hex: str
+
+
+@dataclass(frozen=True, slots=True)
 class TransactionContext:
     txid: str
     transaction_hex: str
     is_coinbase: bool
+    outputs: tuple[TransactionOutputContext, ...]
     spent_outputs: tuple[SpentOutputContext, ...]
 
 
@@ -60,12 +68,21 @@ class BitcoinCoreTransactionSource:
         normalized_txid = _normalize_txid(txid)
         transaction = self._load_transaction(normalized_txid)
         transaction_hex = transaction.to_bytes().hex()
+        outputs = tuple(
+            TransactionOutputContext(
+                vout=vout,
+                amount_sats=output.amount,
+                script_pubkey_hex=output.scriptpubkey.hex(),
+            )
+            for vout, output in enumerate(transaction.outputs)
+        )
 
         if transaction.is_coinbase:
             return TransactionContext(
                 txid=normalized_txid,
                 transaction_hex=transaction_hex,
                 is_coinbase=True,
+                outputs=outputs,
                 spent_outputs=(),
             )
 
@@ -98,6 +115,7 @@ class BitcoinCoreTransactionSource:
             txid=normalized_txid,
             transaction_hex=transaction_hex,
             is_coinbase=False,
+            outputs=outputs,
             spent_outputs=tuple(spent_outputs),
         )
 

@@ -11,6 +11,13 @@ ordered previous-output context required to analyze its inputs.
   "txid": "<64 lowercase hex characters>",
   "transaction_hex": "<canonical serialized transaction>",
   "is_coinbase": false,
+  "outputs": [
+    {
+      "vout": 0,
+      "amount_sats": 1000000000,
+      "script_pubkey_hex": "<locking script>"
+    }
+  ],
   "spent_outputs": [
     {
       "txid": "<previous transaction id>",
@@ -22,8 +29,9 @@ ordered previous-output context required to analyze its inputs.
 }
 ```
 
-Previous outputs appear in the same order as the transaction inputs. Repeated inputs from one previous transaction use
-one Core lookup. Coinbase transactions return `is_coinbase: true` and an empty `spent_outputs` array.
+`outputs` contains every output created by the transaction in `vout` order. Previous outputs appear in the same order
+as the transaction inputs. Repeated inputs from one previous transaction use one Core lookup. Coinbase transactions
+return `is_coinbase: true` and an empty `spent_outputs` array while still returning their created outputs.
 
 Bitcoin Core intentionally excludes the genesis-block coinbase from `getrawtransaction`. For that exact txid, the
 adapter retrieves and verifies block zero, extracts its sole coinbase transaction, and returns the same normal coinbase
