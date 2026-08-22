@@ -38,6 +38,7 @@ class TransactionOutputContext:
     vout: int
     amount_sats: int
     script_pubkey_hex: str
+    output_type: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +83,12 @@ class BitcoinCoreTransactionSource:
                 vout=vout,
                 amount_sats=output.amount,
                 script_pubkey_hex=output.scriptpubkey.hex(),
+                output_type=(
+                    classification.output_type.value
+                    if (classification := classify_spend(output.scriptpubkey)).output_type
+                    is not None
+                    else None
+                ),
             )
             for vout, output in enumerate(transaction.outputs)
         )

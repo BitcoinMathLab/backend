@@ -251,6 +251,7 @@ def create_app(
                     vout=output.vout,
                     amount_sats=output.amount_sats,
                     script_pubkey_hex=output.script_pubkey_hex,
+                    output_type=output.output_type,
                 )
                 for output in context.outputs
             ],

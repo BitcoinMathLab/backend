@@ -129,6 +129,7 @@ class TransactionOutputResponse(APIModel):
     vout: int = Field(ge=0, le=0xFFFFFFFF)
     amount_sats: int = Field(ge=0, le=2_100_000_000_000_000)
     script_pubkey_hex: str = Field(pattern=r"^(?:[0-9a-f]{2})*$", max_length=20_000)
+    output_type: Literal["P2PK", "P2PKH", "P2MS", "P2SH", "P2WPKH", "P2WSH", "P2TR"] | None
 
 
 class TransactionContextResponse(APIModel):
