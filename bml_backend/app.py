@@ -23,10 +23,16 @@ from bml_backend.models import (
     P2PKHTraceRequest,
     P2PKHTraceResponse,
     PreviousOutputResponse,
+    StandardScriptTemplateRequest,
+    StandardScriptTemplateResponse,
     TransactionContextResponse,
     TransactionExampleResponse,
     TransactionExamplesResponse,
     TransactionOutputResponse,
+)
+from bml_backend.script_templates import (
+    ScriptTemplateError,
+    create_standard_script_template,
 )
 from bml_backend.service import TraceRequestError, execute_p2pkh_trace
 from bml_backend.transaction_examples import TRANSACTION_EXAMPLES
@@ -38,6 +44,15 @@ _ENVIRONMENT_SOURCE = object()
 
 
 async def trace_request_error_handler(_request: Request, exc: TraceRequestError) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={"error": {"code": exc.code, "message": exc.message}},
+    )
+
+
+async def script_template_error_handler(
+    _request: Request, exc: ScriptTemplateError
+) -> JSONResponse:
     return JSONResponse(
         status_code=422,
         content={"error": {"code": exc.code, "message": exc.message}},
@@ -84,6 +99,12 @@ def parse_release_identifier(raw_release: str) -> str | None:
 
 async def p2pkh_trace(request: P2PKHTraceRequest) -> P2PKHTraceResponse:
     return execute_p2pkh_trace(request)
+
+
+async def standard_script_template(
+    request: StandardScriptTemplateRequest,
+) -> StandardScriptTemplateResponse:
+    return create_standard_script_template(request)
 
 
 async def observe_request(
@@ -256,6 +277,7 @@ def create_app(
     application.middleware("http")(observe_request)
 
     application.add_exception_handler(TraceRequestError, trace_request_error_handler)
+    application.add_exception_handler(ScriptTemplateError, script_template_error_handler)
     application.add_exception_handler(TransactionSourceError, transaction_source_error_handler)
     application.add_exception_handler(RequestValidationError, request_validation_error_handler)
     application.add_api_route(
@@ -268,6 +290,14 @@ def create_app(
         response_model=P2PKHTraceResponse,
         responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
         tags=["traces"],
+    )
+    application.add_api_route(
+        "/api/v1/scripts/templates",
+        standard_script_template,
+        methods=["POST"],
+        response_model=StandardScriptTemplateResponse,
+        responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+        tags=["scripts"],
     )
     application.add_api_route(
         "/api/v1/transactions/examples",

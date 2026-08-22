@@ -9,7 +9,7 @@ description = "Product API and orchestration for Bitcoin Math Lab"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "bitcoinmathlab-bitclone @ git+https://github.com/BitcoinMathLab/bitclone.git@43956886a473b2e82bddd3b5b19bb26cbb5182e9",
+    "bitcoinmathlab-bitclone @ git+https://github.com/BitcoinMathLab/bitclone.git@bd5212e188ea501d8513bcd65016bbb7de0a3443",
     "fastapi==0.141.1",
     "uvicorn==0.52.4",
 ]

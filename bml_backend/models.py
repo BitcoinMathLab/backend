@@ -156,6 +156,25 @@ class TransactionExamplesResponse(APIModel):
     examples: list[TransactionExampleResponse]
 
 
+class StandardScriptTemplateRequest(APIModel):
+    template: Literal["P2SH", "P2WPKH", "P2WSH", "P2TR-KEY-PATH", "P2TR-SCRIPT-PATH"]
+    program_hex: HexString = Field(max_length=64)
+
+    @field_validator("program_hex")
+    @classmethod
+    def normalize_program_hex(cls, value: str) -> str:
+        return value.lower()
+
+
+class StandardScriptTemplateResponse(APIModel):
+    api_version: Literal["v1"] = "v1"
+    template: Literal["P2SH", "P2WPKH", "P2WSH", "P2TR-KEY-PATH", "P2TR-SCRIPT-PATH"]
+    script_type: Literal["P2SH", "P2WPKH", "P2WSH", "P2TR"]
+    program_hex: HexString = Field(max_length=64)
+    script_pubkey_hex: HexString = Field(max_length=68)
+    address: str = Field(min_length=1, max_length=100)
+
+
 class ErrorBody(APIModel):
     code: str
     message: str
