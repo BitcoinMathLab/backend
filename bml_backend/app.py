@@ -238,6 +238,8 @@ def create_app(
                 "Bitcoin Core transaction lookup is not configured.",
             )
         context = configured_transaction_source.load_context(txid)
+        total_input_sats = sum(output.amount_sats for output in context.spent_outputs)
+        total_output_sats = sum(output.amount_sats for output in context.outputs)
         return TransactionContextResponse(
             txid=context.txid,
             wtxid=context.wtxid,
@@ -246,6 +248,9 @@ def create_app(
             locktime=context.locktime,
             is_segwit=context.is_segwit,
             is_coinbase=context.is_coinbase,
+            total_input_sats=total_input_sats,
+            total_output_sats=total_output_sats,
+            fee_sats=None if context.is_coinbase else total_input_sats - total_output_sats,
             outputs=[
                 TransactionOutputResponse(
                     vout=output.vout,

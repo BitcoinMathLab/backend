@@ -15,6 +15,9 @@ ordered previous-output context required to analyze its inputs.
   "locktime": 0,
   "is_segwit": true,
   "is_coinbase": false,
+  "total_input_sats": 1000010000,
+  "total_output_sats": 1000000000,
+  "fee_sats": 10000,
   "outputs": [
     {
       "vout": 0,
@@ -45,6 +48,10 @@ return `is_coinbase: true` and an empty `spent_outputs` array while still return
 
 `version`, `locktime`, and `is_segwit` decode the transaction header/serialization format. `wtxid` equals `txid` for
 legacy transactions and identifies the witness-inclusive serialization for SegWit transactions.
+
+`total_input_sats` sums the resolved previous outputs, `total_output_sats` sums the newly created outputs, and
+`fee_sats` is their difference. Coinbase transactions report zero input sats and `fee_sats: null` because their output
+value is a block subsidy plus fees rather than a transaction fee calculation.
 
 Bitcoin Core intentionally excludes the genesis-block coinbase from `getrawtransaction`. For that exact txid, the
 adapter retrieves and verifies block zero, extracts its sole coinbase transaction, and returns the same normal coinbase

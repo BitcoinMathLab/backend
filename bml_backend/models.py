@@ -141,6 +141,9 @@ class TransactionContextResponse(APIModel):
     locktime: int = Field(ge=0, le=0xFFFFFFFF)
     is_segwit: bool
     is_coinbase: bool
+    total_input_sats: int = Field(ge=0, le=2_100_000_000_000_000)
+    total_output_sats: int = Field(ge=0, le=2_100_000_000_000_000)
+    fee_sats: int | None = Field(default=None, ge=0, le=2_100_000_000_000_000)
     outputs: list[TransactionOutputResponse]
     spent_outputs: list[PreviousOutputResponse]
 
