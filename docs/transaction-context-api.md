@@ -11,6 +11,13 @@ ordered previous-output context required to analyze its inputs.
   "txid": "<64 lowercase hex characters>",
   "transaction_hex": "<canonical serialized transaction>",
   "is_coinbase": false,
+  "outputs": [
+    {
+      "vout": 0,
+      "amount_sats": 1000000000,
+      "script_pubkey_hex": "<locking script>"
+    }
+  ],
   "spent_outputs": [
     {
       "txid": "<previous transaction id>",
@@ -26,8 +33,13 @@ ordered previous-output context required to analyze its inputs.
 }
 ```
 
-Previous outputs appear in the same order as the transaction inputs. Repeated inputs from one previous transaction use
-one Core lookup. Coinbase transactions return `is_coinbase: true` and an empty `spent_outputs` array.
+`outputs` contains every output created by the transaction in `vout` order. Previous outputs appear in the same order
+as the transaction inputs. Repeated inputs from one previous transaction use one Core lookup. Coinbase transactions
+return `is_coinbase: true` and an empty `spent_outputs` array while still returning their created outputs.
+
+Bitcoin Core intentionally excludes the genesis-block coinbase from `getrawtransaction`. For that exact txid, the
+adapter retrieves and verifies block zero, extracts its sole coinbase transaction, and returns the same normal coinbase
+context shape. No other failed transaction lookup uses this fallback.
 
 `output_type` describes the previous output's locking-script family. `spend_type` additionally distinguishes nested
 P2SH-SegWit and Taproot key/script paths using the spending input. Unsupported or structurally ambiguous data is
@@ -61,6 +73,8 @@ Manual validation requires a synchronized, unpruned Bitcoin Core node with `txin
    that input's previous output and spend path.
 5. Request a malformed txid and expect a safe 422 response.
 6. Stop the tunnel, retry the known txid, and expect a safe 503 response with an `X-Request-ID` header.
+7. Request `4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b`. Expect HTTP 200,
+   `is_coinbase: true`, and no previous outputs.
 
-The live success case remains deferred while the development Core node builds its transaction index. Tunnel operation,
-cookie authentication, and the safe unavailable response have already passed manual QA.
+The live ordinary-transaction and genesis-coinbase success cases, tunnel operation, cookie authentication, and the safe
+unavailable response have passed manual QA against the development Core node.

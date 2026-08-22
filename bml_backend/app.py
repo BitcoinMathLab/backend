@@ -24,6 +24,7 @@ from bml_backend.models import (
     P2PKHTraceResponse,
     PreviousOutputResponse,
     TransactionContextResponse,
+    TransactionOutputResponse,
 )
 from bml_backend.service import TraceRequestError, execute_p2pkh_trace
 
@@ -200,6 +201,14 @@ def create_app(
             txid=context.txid,
             transaction_hex=context.transaction_hex,
             is_coinbase=context.is_coinbase,
+            outputs=[
+                TransactionOutputResponse(
+                    vout=output.vout,
+                    amount_sats=output.amount_sats,
+                    script_pubkey_hex=output.script_pubkey_hex,
+                )
+                for output in context.outputs
+            ],
             spent_outputs=[
                 PreviousOutputResponse(
                     txid=output.txid,

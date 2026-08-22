@@ -4,13 +4,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from src.block import Block
 from src.database.bitcoin_core_rpc import BitcoinCoreRPCError
 from src.script import classify_spend
 from src.tx import Tx
 
 
+GENESIS_TXID = "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"
+
+
 class BitcoinCoreClient(Protocol):
     def get_raw_transaction(self, display_txid: str, verbose: bool = False): ...
+
+    def get_block_hash(self, height: int) -> bytes: ...
+
+    def get_block(self, block_hash: bytes) -> bytes: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,10 +34,18 @@ class SpentOutputContext:
 
 
 @dataclass(frozen=True, slots=True)
+class TransactionOutputContext:
+    vout: int
+    amount_sats: int
+    script_pubkey_hex: str
+
+
+@dataclass(frozen=True, slots=True)
 class TransactionContext:
     txid: str
     transaction_hex: str
     is_coinbase: bool
+    outputs: tuple[TransactionOutputContext, ...]
     spent_outputs: tuple[SpentOutputContext, ...]
 
 
@@ -57,12 +73,21 @@ class BitcoinCoreTransactionSource:
         normalized_txid = _normalize_txid(txid)
         transaction = self._load_transaction(normalized_txid)
         transaction_hex = transaction.to_bytes().hex()
+        outputs = tuple(
+            TransactionOutputContext(
+                vout=vout,
+                amount_sats=output.amount,
+                script_pubkey_hex=output.scriptpubkey.hex(),
+            )
+            for vout, output in enumerate(transaction.outputs)
+        )
 
         if transaction.is_coinbase:
             return TransactionContext(
                 txid=normalized_txid,
                 transaction_hex=transaction_hex,
                 is_coinbase=True,
+                outputs=outputs,
                 spent_outputs=(),
             )
 
@@ -117,6 +142,7 @@ class BitcoinCoreTransactionSource:
             txid=normalized_txid,
             transaction_hex=transaction_hex,
             is_coinbase=False,
+            outputs=outputs,
             spent_outputs=tuple(spent_outputs),
         )
 
@@ -124,6 +150,8 @@ class BitcoinCoreTransactionSource:
         try:
             raw_hex = self._client.get_raw_transaction(txid, False)
         except BitcoinCoreRPCError as exc:
+            if txid == GENESIS_TXID:
+                return self._load_genesis_transaction()
             raise TransactionSourceError(
                 "bitcoin-core-unavailable",
                 "Bitcoin Core could not provide the requested transaction.",
@@ -149,6 +177,35 @@ class BitcoinCoreTransactionSource:
                 "Bitcoin Core returned transaction data that does not match the requested txid.",
             )
         return transaction
+
+    def _load_genesis_transaction(self) -> Tx:
+        """Load block zero because Core excludes its coinbase from getrawtransaction."""
+        try:
+            block_hash = self._client.get_block_hash(0)
+            raw_block = self._client.get_block(block_hash)
+            block = Block.from_bytes(raw_block)
+        except BitcoinCoreRPCError as exc:
+            raise TransactionSourceError(
+                "bitcoin-core-unavailable",
+                "Bitcoin Core could not provide the requested transaction.",
+            ) from exc
+        except Exception as exc:
+            raise TransactionSourceError(
+                "invalid-source-data",
+                "Bitcoin Core returned invalid genesis block data.",
+            ) from exc
+
+        if (
+            block.to_bytes() != raw_block
+            or block.block_id != block_hash
+            or len(block.txs) != 1
+            or block.txs[0].txid[::-1].hex() != GENESIS_TXID
+        ):
+            raise TransactionSourceError(
+                "invalid-source-data",
+                "Bitcoin Core returned invalid genesis block data.",
+            )
+        return block.txs[0]
 
 
 def _normalize_txid(txid: str) -> str:
