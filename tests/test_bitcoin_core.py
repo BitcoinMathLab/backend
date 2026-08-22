@@ -2,14 +2,20 @@ from collections import Counter
 
 import pytest
 from src.database.bitcoin_core_rpc import BitcoinCoreRPCError
+from src.blockchain.genesis_block import genesis_block
 from src.tx import Tx, TxIn, TxOut
 
-from bml_backend.bitcoin_core import BitcoinCoreTransactionSource, TransactionSourceError
+from bml_backend.bitcoin_core import (
+    GENESIS_TXID,
+    BitcoinCoreTransactionSource,
+    TransactionSourceError,
+)
 
 
 class FakeBitcoinCore:
-    def __init__(self, transactions):
+    def __init__(self, transactions, block=None):
         self.transactions = transactions
+        self.block = block
         self.calls = Counter()
 
     def get_raw_transaction(self, display_txid, verbose=False):
@@ -19,6 +25,18 @@ class FakeBitcoinCore:
         if isinstance(value, Exception):
             raise value
         return value
+
+    def get_block_hash(self, height):
+        self.calls[("getblockhash", height)] += 1
+        assert height == 0
+        assert self.block is not None
+        return self.block.block_id
+
+    def get_block(self, block_hash):
+        self.calls[("getblock", block_hash)] += 1
+        assert self.block is not None
+        assert block_hash == self.block.block_id
+        return self.block.to_bytes()
 
 
 def transaction_hex(transaction):
@@ -89,6 +107,27 @@ def test_coinbase_context_has_no_previous_outputs():
         for output in context.outputs
     ] == [(0, 5_000_000_000, "51")]
     assert context.spent_outputs == ()
+
+
+def test_loads_genesis_coinbase_from_block_zero_when_core_rejects_raw_lookup():
+    client = FakeBitcoinCore(
+        {
+            GENESIS_TXID: BitcoinCoreRPCError(
+                "The genesis block coinbase is not considered an ordinary transaction"
+            )
+        },
+        block=genesis_block,
+    )
+
+    context = BitcoinCoreTransactionSource(client).load_context(GENESIS_TXID)
+
+    assert context.txid == GENESIS_TXID
+    assert context.transaction_hex == genesis_block.txs[0].to_bytes().hex()
+    assert context.is_coinbase is True
+    assert context.spent_outputs == ()
+    assert client.calls[GENESIS_TXID] == 1
+    assert client.calls[("getblockhash", 0)] == 1
+    assert client.calls[("getblock", genesis_block.block_id)] == 1
 
 
 @pytest.mark.parametrize("txid", ["", "00", "gg" * 32])

@@ -43,6 +43,9 @@ still indexing, the endpoint returns a stable HTTP 503 response instead of expos
 authentication is also supported through `BML_CORE_RPC_USER` and `BML_CORE_RPC_PASSWORD`; credentials must never be
 placed in the RPC URL or committed to the repository. `BML_CORE_RPC_TIMEOUT` defaults to 10 seconds.
 
+The genesis-block coinbase is also supported. Because Bitcoin Core intentionally excludes it from
+`getrawtransaction`, the adapter verifies block zero and extracts its sole transaction through a dedicated fallback.
+
 ## Runtime configuration
 
 The service is safe to run without browser cross-origin access. When the frontend and API use different origins, set
