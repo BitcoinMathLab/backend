@@ -19,7 +19,8 @@ ordered previous-output context required to analyze its inputs.
     {
       "vout": 0,
       "amount_sats": 1000000000,
-      "script_pubkey_hex": "<locking script>"
+      "script_pubkey_hex": "<locking script>",
+      "output_type": "P2WPKH"
     }
   ],
   "spent_outputs": [
@@ -37,7 +38,8 @@ ordered previous-output context required to analyze its inputs.
 }
 ```
 
-`outputs` contains every output created by the transaction in `vout` order. Previous outputs appear in the same order
+`outputs` contains every output created by the transaction in `vout` order, including the recognized locking-script
+family when one is available. Previous outputs appear in the same order
 as the transaction inputs. Repeated inputs from one previous transaction use one Core lookup. Coinbase transactions
 return `is_coinbase: true` and an empty `spent_outputs` array while still returning their created outputs.
 

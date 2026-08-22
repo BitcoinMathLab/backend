@@ -55,6 +55,7 @@ async def test_returns_versioned_transaction_and_spent_output_context():
                     vout=0,
                     amount_sats=54_321,
                     script_pubkey_hex="52",
+                    output_type=None,
                 ),
             ),
             spent_outputs=(
@@ -86,6 +87,7 @@ async def test_returns_versioned_transaction_and_spent_output_context():
                 "vout": 0,
                 "amount_sats": 54_321,
                 "script_pubkey_hex": "52",
+                "output_type": None,
             }
         ],
         "spent_outputs": [

@@ -85,9 +85,9 @@ def test_loads_transaction_and_ordered_previous_output_context():
     assert context.is_segwit is False
     assert context.is_coinbase is False
     assert [
-        (output.vout, output.amount_sats, output.script_pubkey_hex)
+        (output.vout, output.amount_sats, output.script_pubkey_hex, output.output_type)
         for output in context.outputs
-    ] == [(0, 3_500, "51")]
+    ] == [(0, 3_500, "51", None)]
     actual_outputs = [
         (output.vout, output.amount_sats, output.script_pubkey_hex, output.spend_type)
         for output in context.spent_outputs
@@ -142,9 +142,9 @@ def test_coinbase_context_has_no_previous_outputs():
     assert context.wtxid == display_txid(coinbase)
     assert context.is_segwit is False
     assert [
-        (output.vout, output.amount_sats, output.script_pubkey_hex)
+        (output.vout, output.amount_sats, output.script_pubkey_hex, output.output_type)
         for output in context.outputs
-    ] == [(0, 5_000_000_000, "51")]
+    ] == [(0, 5_000_000_000, "51", None)]
     assert context.spent_outputs == ()
 
 
