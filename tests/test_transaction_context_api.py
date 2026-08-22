@@ -62,7 +62,7 @@ async def test_returns_versioned_transaction_and_spent_output_context():
                 SpentOutputContext(
                     txid=PREVIOUS_TXID,
                     vout=1,
-                    amount_sats=12_345,
+                    amount_sats=60_000,
                     script_pubkey_hex="76a914" + "33" * 20 + "88ac",
                     output_type="P2PKH",
                     spend_type="P2PKH",
@@ -82,6 +82,9 @@ async def test_returns_versioned_transaction_and_spent_output_context():
         "locktime": 0,
         "is_segwit": False,
         "is_coinbase": False,
+        "total_input_sats": 60_000,
+        "total_output_sats": 54_321,
+        "fee_sats": 5_679,
         "outputs": [
             {
                 "vout": 0,
@@ -94,7 +97,7 @@ async def test_returns_versioned_transaction_and_spent_output_context():
             {
                 "txid": PREVIOUS_TXID,
                 "vout": 1,
-                "amount_sats": 12_345,
+                "amount_sats": 60_000,
                 "script_pubkey_hex": "76a914" + "33" * 20 + "88ac",
                 "output_type": "P2PKH",
                 "spend_type": "P2PKH",
@@ -105,6 +108,35 @@ async def test_returns_versioned_transaction_and_spent_output_context():
     }
     assert source.txids == [TXID]
     assert len(response.headers["x-request-id"]) == 32
+
+
+async def test_coinbase_value_summary_has_no_transaction_fee():
+    source = FakeTransactionSource(
+        TransactionContext(
+            txid=TXID,
+            wtxid=TXID,
+            transaction_hex="01000000000100",
+            version=1,
+            locktime=0,
+            is_segwit=False,
+            is_coinbase=True,
+            outputs=(
+                TransactionOutputContext(
+                    vout=0,
+                    amount_sats=5_000_000_000,
+                    script_pubkey_hex="51",
+                ),
+            ),
+            spent_outputs=(),
+        )
+    )
+
+    response = await request(create_app(cors_origins=[], transaction_source=source))
+
+    assert response.status_code == 200
+    assert response.json()["total_input_sats"] == 0
+    assert response.json()["total_output_sats"] == 5_000_000_000
+    assert response.json()["fee_sats"] is None
 
 
 async def test_reports_unconfigured_core_as_service_unavailable():
