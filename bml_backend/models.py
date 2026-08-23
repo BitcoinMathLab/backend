@@ -10,6 +10,10 @@ HexString = Annotated[
     str,
     StringConstraints(strip_whitespace=True, pattern=r"^(?:[0-9a-fA-F]{2})+$"),
 ]
+StackItemHex = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, pattern=r"^(?:[0-9a-fA-F]{2})*$", max_length=1_040),
+]
 SpendTypeName = Literal[
     "P2PK",
     "P2PKH",
@@ -47,6 +51,17 @@ class P2PKHTraceRequest(APIModel):
     @classmethod
     def normalize_transaction_hex(cls, value: str) -> str:
         return value.lower()
+
+
+class OpcodeTraceRequest(APIModel):
+    opcode: Literal["OP_DUP"]
+    main_stack: list[StackItemHex] = Field(default_factory=list, max_length=100)
+    alt_stack: list[StackItemHex] = Field(default_factory=list, max_length=100)
+
+    @field_validator("main_stack", "alt_stack")
+    @classmethod
+    def normalize_stack_hex(cls, values: list[str]) -> list[str]:
+        return [value.lower() for value in values]
 
 
 class StackSnapshotResponse(APIModel):
@@ -109,6 +124,14 @@ class P2PKHTraceResponse(APIModel):
     script_type: Literal["P2PKH"] = "P2PKH"
     input_index: int = Field(ge=0)
     scripts: ScriptPairResponse
+    trace: ExecutionTraceResponse
+
+
+class OpcodeTraceResponse(APIModel):
+    api_version: Literal["v1"] = "v1"
+    mode: Literal["opcode"] = "opcode"
+    opcode: Literal["OP_DUP"] = "OP_DUP"
+    initial_stacks: StackPairResponse
     trace: ExecutionTraceResponse
 
 

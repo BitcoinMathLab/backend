@@ -92,6 +92,55 @@ async def test_invalid_signature_is_a_normal_failure_trace():
     assert "exception_type" not in str(payload)
 
 
+async def test_op_dup_traces_user_supplied_main_and_alt_stacks():
+    response = await api_request(
+        "POST",
+        "/api/v1/traces/opcode",
+        json={"opcode": "OP_DUP", "main_stack": ["deadbeef", "01"], "alt_stack": ["aa"]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["mode"] == "opcode"
+    assert payload["opcode"] == "OP_DUP"
+    assert payload["initial_stacks"] == {
+        "main": {"depth": 2, "items": ["deadbeef", "01"]},
+        "alt": {"depth": 1, "items": ["aa"]},
+    }
+    assert payload["trace"]["success"] is True
+    assert payload["trace"]["steps"][0]["opcode"]["name"] == "OP_DUP"
+    assert payload["trace"]["steps"][0]["stacks"]["after"] == {
+        "main": {"depth": 3, "items": ["deadbeef", "deadbeef", "01"]},
+        "alt": {"depth": 1, "items": ["aa"]},
+    }
+
+
+async def test_op_dup_empty_stack_is_a_normal_failed_execution():
+    response = await api_request(
+        "POST", "/api/v1/traces/opcode", json={"opcode": "OP_DUP", "main_stack": []}
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["trace"]["success"] is False
+    assert payload["trace"]["diagnostic"]["code"] == "execution-error"
+    assert payload["trace"]["diagnostic"]["opcode_name"] == "OP_DUP"
+
+
+async def test_opcode_trace_rejects_unsupported_opcodes_and_oversized_items():
+    unsupported = await api_request(
+        "POST", "/api/v1/traces/opcode", json={"opcode": "OP_DROP", "main_stack": ["01"]}
+    )
+    oversized = await api_request(
+        "POST", "/api/v1/traces/opcode", json={"opcode": "OP_DUP", "main_stack": ["aa" * 521]}
+    )
+
+    assert unsupported.status_code == 422
+    assert oversized.status_code == 422
+    assert unsupported.json()["error"]["code"] == "request-validation"
+    assert oversized.json()["error"]["code"] == "request-validation"
+
+
 async def test_request_validation_has_stable_safe_shape():
     response = await api_request(
         "POST",
@@ -178,4 +227,8 @@ async def test_openapi_publishes_versioned_trace_contract():
     )
     assert operation["responses"]["422"]["content"]["application/json"]["schema"]["$ref"].endswith(
         "/ErrorResponse"
+    )
+    opcode_operation = document["paths"]["/api/v1/traces/opcode"]["post"]
+    assert opcode_operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/OpcodeTraceResponse"
     )

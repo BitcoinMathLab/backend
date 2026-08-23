@@ -3,12 +3,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.script import P2PKHTraceResult, trace_p2pkh_spend
+from src.script import P2PKHTraceResult, ScriptEngine, trace_p2pkh_spend
 from src.tx import Tx, UTXO
 
 from bml_backend.models import (
     ExecutionTraceResponse,
     OpcodeResponse,
+    OpcodeTraceRequest,
+    OpcodeTraceResponse,
     P2PKHTraceRequest,
     P2PKHTraceResponse,
     ScriptPairResponse,
@@ -48,8 +50,20 @@ def _snapshot_response(snapshot) -> StackSnapshotResponse:
 
 
 def _result_response(result: P2PKHTraceResult) -> P2PKHTraceResponse:
+    return P2PKHTraceResponse(
+        input_index=result.input_index,
+        scripts=ScriptPairResponse(
+            unlocking=result.unlocking_script.hex(),
+            locking=result.locking_script.hex(),
+            combined=result.combined_script.hex(),
+        ),
+        trace=_trace_response(result.trace),
+    )
+
+
+def _trace_response(trace) -> ExecutionTraceResponse:
     steps = []
-    for step in result.trace.steps:
+    for step in trace.steps:
         steps.append(TraceStepResponse(
             index=step.index,
             opcode=OpcodeResponse(**step.opcode.to_dict()),
@@ -67,20 +81,38 @@ def _result_response(result: P2PKHTraceResult) -> P2PKHTraceResponse:
             diagnostic=_diagnostic_response(step.diagnostic),
         ))
 
-    return P2PKHTraceResponse(
-        input_index=result.input_index,
-        scripts=ScriptPairResponse(
-            unlocking=result.unlocking_script.hex(),
-            locking=result.locking_script.hex(),
-            combined=result.combined_script.hex(),
+    return ExecutionTraceResponse(
+        schema_version=trace.SCHEMA_VERSION,
+        script=trace.script.hex(),
+        success=bool(trace.success),
+        steps=steps,
+        diagnostic=_diagnostic_response(trace.diagnostic),
+    )
+
+
+def execute_opcode_trace(request: OpcodeTraceRequest) -> OpcodeTraceResponse:
+    engine = ScriptEngine()
+    for value in reversed(request.main_stack):
+        engine.stack.push(bytes.fromhex(value))
+    for value in reversed(request.alt_stack):
+        engine.alt_stack.push(bytes.fromhex(value))
+
+    try:
+        trace = engine.trace_script(bytes.fromhex("76"))
+    except Exception:
+        trace = engine.last_trace
+        if trace is None:  # pragma: no cover - defensive engine boundary
+            raise TraceRequestError(
+                "execution-error",
+                "Bitclone could not trace the supplied opcode state.",
+            )
+
+    return OpcodeTraceResponse(
+        initial_stacks=StackPairResponse(
+            main=_snapshot_response(trace.initial_main_stack),
+            alt=_snapshot_response(trace.initial_alt_stack),
         ),
-        trace=ExecutionTraceResponse(
-            schema_version=result.trace.SCHEMA_VERSION,
-            script=result.trace.script.hex(),
-            success=bool(result.trace.success),
-            steps=steps,
-            diagnostic=_diagnostic_response(result.trace.diagnostic),
-        ),
+        trace=_trace_response(trace),
     )
 
 

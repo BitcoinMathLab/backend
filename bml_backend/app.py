@@ -20,6 +20,8 @@ from bml_backend.bitcoin_core import TransactionContextSource, TransactionSource
 from bml_backend.config import transaction_source_from_environment
 from bml_backend.models import (
     ErrorResponse,
+    OpcodeTraceRequest,
+    OpcodeTraceResponse,
     P2PKHTraceRequest,
     P2PKHTraceResponse,
     PreviousOutputResponse,
@@ -35,7 +37,7 @@ from bml_backend.script_templates import (
     ScriptTemplateError,
     create_standard_script_template,
 )
-from bml_backend.service import TraceRequestError, execute_p2pkh_trace
+from bml_backend.service import TraceRequestError, execute_opcode_trace, execute_p2pkh_trace
 from bml_backend.transaction_examples import TRANSACTION_EXAMPLES
 
 
@@ -100,6 +102,10 @@ def parse_release_identifier(raw_release: str) -> str | None:
 
 async def p2pkh_trace(request: P2PKHTraceRequest) -> P2PKHTraceResponse:
     return execute_p2pkh_trace(request)
+
+
+async def opcode_trace(request: OpcodeTraceRequest) -> OpcodeTraceResponse:
+    return execute_opcode_trace(request)
 
 
 async def standard_script_template(
@@ -314,6 +320,14 @@ def create_app(
         p2pkh_trace,
         methods=["POST"],
         response_model=P2PKHTraceResponse,
+        responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+        tags=["traces"],
+    )
+    application.add_api_route(
+        "/api/v1/traces/opcode",
+        opcode_trace,
+        methods=["POST"],
+        response_model=OpcodeTraceResponse,
         responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
         tags=["traces"],
     )
