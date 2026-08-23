@@ -55,10 +55,11 @@ class P2PKHTraceRequest(APIModel):
 
 class OpcodeTraceRequest(APIModel):
     opcode: Literal["OP_DUP"]
+    flow_data: list[StackItemHex] = Field(default_factory=list, max_length=20)
     main_stack: list[StackItemHex] = Field(default_factory=list, max_length=100)
     alt_stack: list[StackItemHex] = Field(default_factory=list, max_length=100)
 
-    @field_validator("main_stack", "alt_stack")
+    @field_validator("flow_data", "main_stack", "alt_stack")
     @classmethod
     def normalize_stack_hex(cls, values: list[str]) -> list[str]:
         return [value.lower() for value in values]

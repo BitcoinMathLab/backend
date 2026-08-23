@@ -127,6 +127,26 @@ async def test_op_dup_empty_stack_is_a_normal_failed_execution():
     assert payload["trace"]["diagnostic"]["opcode_name"] == "OP_DUP"
 
 
+async def test_op_dup_canonically_pushes_flow_data_before_execution():
+    response = await api_request(
+        "POST",
+        "/api/v1/traces/opcode",
+        json={"opcode": "OP_DUP", "flow_data": ["aa" * 76]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["trace"]["script"].startswith("4c4c")
+    assert [step["opcode"]["name"] for step in payload["trace"]["steps"]] == [
+        "OP_PUSHDATA1",
+        "OP_DUP",
+    ]
+    assert payload["trace"]["steps"][-1]["stacks"]["after"]["main"]["items"] == [
+        "aa" * 76,
+        "aa" * 76,
+    ]
+
+
 async def test_opcode_trace_rejects_unsupported_opcodes_and_oversized_items():
     unsupported = await api_request(
         "POST", "/api/v1/traces/opcode", json={"opcode": "OP_DROP", "main_stack": ["01"]}

@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from src.script import P2PKHTraceResult, ScriptEngine, trace_p2pkh_spend
+from src.script.stack_ops import encode_pushdata
 from src.tx import Tx, UTXO
 
 from bml_backend.models import (
@@ -97,8 +98,9 @@ def execute_opcode_trace(request: OpcodeTraceRequest) -> OpcodeTraceResponse:
     for value in reversed(request.alt_stack):
         engine.alt_stack.push(bytes.fromhex(value))
 
+    script = b"".join(encode_pushdata(bytes.fromhex(value)) for value in request.flow_data) + bytes.fromhex("76")
     try:
-        trace = engine.trace_script(bytes.fromhex("76"))
+        trace = engine.trace_script(script)
     except Exception:
         trace = engine.last_trace
         if trace is None:  # pragma: no cover - defensive engine boundary
