@@ -110,7 +110,7 @@ class BitcoinCoreTransactionSource:
                 spent_outputs=(),
                 size_bytes=len(transaction.to_bytes()),
                 weight_units=transaction.wu,
-                virtual_size_vbytes=(transaction.wu + 3) // 4,
+                virtual_size_vbytes=transaction.vbytes,
                 byte_fields=inspect_transaction_bytes(transaction),
             )
 
@@ -173,7 +173,7 @@ class BitcoinCoreTransactionSource:
             spent_outputs=tuple(spent_outputs),
             size_bytes=len(transaction.to_bytes()),
             weight_units=transaction.wu,
-            virtual_size_vbytes=(transaction.wu + 3) // 4,
+            virtual_size_vbytes=transaction.vbytes,
             byte_fields=inspect_transaction_bytes(transaction),
         )
 

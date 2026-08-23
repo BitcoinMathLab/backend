@@ -85,7 +85,8 @@ def test_loads_transaction_and_ordered_previous_output_context():
     assert context.is_segwit is False
     assert context.size_bytes == len(target.to_bytes())
     assert context.weight_units == target.wu
-    assert context.virtual_size_vbytes == (target.wu + 3) // 4
+    assert context.virtual_size_vbytes == target.vbytes
+    assert isinstance(context.virtual_size_vbytes, int)
     assert "".join(field.hex for field in context.byte_fields) == context.transaction_hex
     assert context.byte_fields[0].id == "version"
     assert context.byte_fields[-1].id == "locktime"
@@ -134,7 +135,8 @@ def test_aligns_witnesses_with_inputs_to_classify_taproot_paths():
     assert context.wtxid != context.txid
     assert context.size_bytes == len(target.to_bytes())
     assert context.weight_units == target.wu
-    assert context.virtual_size_vbytes == (target.wu + 3) // 4
+    assert context.virtual_size_vbytes == target.vbytes
+    assert isinstance(context.virtual_size_vbytes, int)
     assert "".join(field.hex for field in context.byte_fields) == context.transaction_hex
     assert any(field.group == "witness" for field in context.byte_fields)
     assert [output.spend_type for output in context.spent_outputs] == [
