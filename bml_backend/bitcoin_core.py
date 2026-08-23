@@ -7,7 +7,7 @@ from typing import Protocol
 from src.block import Block
 from src.database.bitcoin_core_rpc import BitcoinCoreRPCError
 from src.script import classify_spend
-from src.tx import Tx
+from src.tx import Tx, TransactionByteField, inspect_transaction_bytes
 
 
 GENESIS_TXID = "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"
@@ -55,6 +55,7 @@ class TransactionContext:
     size_bytes: int = 0
     weight_units: int = 0
     virtual_size_vbytes: int = 0
+    byte_fields: tuple[TransactionByteField, ...] = ()
 
 
 class TransactionContextSource(Protocol):
@@ -110,6 +111,7 @@ class BitcoinCoreTransactionSource:
                 size_bytes=len(transaction.to_bytes()),
                 weight_units=transaction.wu,
                 virtual_size_vbytes=(transaction.wu + 3) // 4,
+                byte_fields=inspect_transaction_bytes(transaction),
             )
 
         previous_transactions: dict[str, Tx] = {}
@@ -172,6 +174,7 @@ class BitcoinCoreTransactionSource:
             size_bytes=len(transaction.to_bytes()),
             weight_units=transaction.wu,
             virtual_size_vbytes=(transaction.wu + 3) // 4,
+            byte_fields=inspect_transaction_bytes(transaction),
         )
 
     def _load_transaction(self, txid: str) -> Tx:

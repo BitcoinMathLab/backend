@@ -26,6 +26,7 @@ from bml_backend.models import (
     StandardScriptTemplateRequest,
     StandardScriptTemplateResponse,
     TransactionContextResponse,
+    TransactionByteFieldResponse,
     TransactionExampleResponse,
     TransactionExamplesResponse,
     TransactionOutputResponse,
@@ -254,6 +255,18 @@ def create_app(
             size_bytes=context.size_bytes,
             weight_units=context.weight_units,
             virtual_size_vbytes=context.virtual_size_vbytes,
+            byte_fields=[
+                TransactionByteFieldResponse(
+                    id=field.id,
+                    label=field.label,
+                    group=field.group,
+                    offset=field.offset,
+                    length=field.length,
+                    hex=field.hex,
+                    decoded=field.decoded,
+                )
+                for field in context.byte_fields
+            ],
             outputs=[
                 TransactionOutputResponse(
                     vout=output.vout,

@@ -132,6 +132,16 @@ class TransactionOutputResponse(APIModel):
     output_type: Literal["P2PK", "P2PKH", "P2MS", "P2SH", "P2WPKH", "P2WSH", "P2TR"] | None
 
 
+class TransactionByteFieldResponse(APIModel):
+    id: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=100)
+    label: str = Field(min_length=1, max_length=120)
+    group: Literal["header", "input", "output", "witness", "footer"]
+    offset: int = Field(ge=0, le=4_000_000)
+    length: int = Field(ge=1, le=4_000_000)
+    hex: HexString = Field(max_length=8_000_000)
+    decoded: str = Field(min_length=1, max_length=200)
+
+
 class TransactionContextResponse(APIModel):
     api_version: Literal["v1"] = "v1"
     txid: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -147,6 +157,7 @@ class TransactionContextResponse(APIModel):
     size_bytes: int = Field(ge=0, le=4_000_000)
     weight_units: int = Field(ge=0, le=4_000_000)
     virtual_size_vbytes: int = Field(ge=0, le=1_000_000)
+    byte_fields: list[TransactionByteFieldResponse]
     outputs: list[TransactionOutputResponse]
     spent_outputs: list[PreviousOutputResponse]
 

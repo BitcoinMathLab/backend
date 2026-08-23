@@ -1,5 +1,6 @@
 import httpx
 import pytest
+from src.tx import TransactionByteField
 
 from bml_backend.app import create_app
 from bml_backend.bitcoin_core import (
@@ -71,6 +72,17 @@ async def test_returns_versioned_transaction_and_spent_output_context():
             size_bytes=225,
             weight_units=900,
             virtual_size_vbytes=225,
+            byte_fields=(
+                TransactionByteField(
+                    id="version",
+                    label="Version",
+                    group="header",
+                    offset=0,
+                    length=4,
+                    hex="01000000",
+                    decoded="1",
+                ),
+            ),
         )
     )
     response = await request(create_app(cors_origins=[], transaction_source=source))
@@ -91,6 +103,17 @@ async def test_returns_versioned_transaction_and_spent_output_context():
         "size_bytes": 225,
         "weight_units": 900,
         "virtual_size_vbytes": 225,
+        "byte_fields": [
+            {
+                "id": "version",
+                "label": "Version",
+                "group": "header",
+                "offset": 0,
+                "length": 4,
+                "hex": "01000000",
+                "decoded": "1",
+            }
+        ],
         "outputs": [
             {
                 "vout": 0,
