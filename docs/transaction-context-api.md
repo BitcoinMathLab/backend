@@ -21,6 +21,17 @@ ordered previous-output context required to analyze its inputs.
   "size_bytes": 223,
   "weight_units": 562,
   "virtual_size_vbytes": 141,
+  "byte_fields": [
+    {
+      "id": "version",
+      "label": "Version",
+      "group": "header",
+      "offset": 0,
+      "length": 4,
+      "hex": "02000000",
+      "decoded": "2"
+    }
+  ],
   "outputs": [
     {
       "vout": 0,
@@ -57,6 +68,8 @@ legacy transactions and identifies the witness-inclusive serialization for SegWi
 value is a block subsidy plus fees rather than a transaction fee calculation.
 
 `size_bytes`, `weight_units`, and `virtual_size_vbytes` expose the serialized size and SegWit-aware resource metrics.
+`byte_fields` maps every byte of the canonical transaction to an ordered field. Concatenating each field's `hex`
+reconstructs `transaction_hex`; offsets are zero-based and witness fields appear in their serialized position.
 
 Bitcoin Core intentionally excludes the genesis-block coinbase from `getrawtransaction`. For that exact txid, the
 adapter retrieves and verifies block zero, extracts its sole coinbase transaction, and returns the same normal coinbase
