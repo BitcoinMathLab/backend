@@ -90,6 +90,9 @@ def test_loads_transaction_and_ordered_previous_output_context():
     assert "".join(field.hex for field in context.byte_fields) == context.transaction_hex
     assert context.byte_fields[0].id == "version"
     assert context.byte_fields[-1].id == "locktime"
+    assert next(field for field in context.byte_fields if field.id == "input-count").decoded == (
+        "2 (1 byte CompactSize)"
+    )
     assert next(field for field in context.byte_fields if field.id == "output-0-script-pubkey").decoded == (
         "1 byte nonstandard or unrecognized locking script"
     )
