@@ -147,6 +147,27 @@ async def test_op_dup_canonically_pushes_flow_data_before_execution():
     ]
 
 
+@pytest.mark.parametrize(
+    ("size", "prefix"),
+    [(1, "01"), (75, "4b"), (76, "4c4c"), (255, "4cff"), (256, "4d0001"), (520, "4d0802")],
+)
+async def test_opcode_flow_push_boundaries(size: int, prefix: str):
+    value = "aa" * size
+    response = await api_request(
+        "POST",
+        "/api/v1/traces/opcode",
+        json={"opcode": "OP_DUP", "flow_data": [value]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["trace"]["script"].startswith(prefix)
+    assert payload["trace"]["steps"][-1]["stacks"]["after"]["main"]["items"] == [
+        value,
+        value,
+    ]
+
+
 async def test_opcode_trace_rejects_unsupported_opcodes_and_oversized_items():
     unsupported = await api_request(
         "POST", "/api/v1/traces/opcode", json={"opcode": "OP_DROP", "main_stack": ["01"]}
