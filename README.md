@@ -49,6 +49,12 @@ native and nested SegWit, and Taproot key-path/script-path spends without treati
 The genesis-block coinbase is also supported. Because Bitcoin Core intentionally excludes it from
 `getrawtransaction`, the adapter verifies block zero and extracts its sole transaction through a dedicated fallback.
 
+`GET /api/v1/transactions/examples` exposes a Core-independent educational catalog of verified mainnet examples for
+the explorer, including their expected input/output shapes and spend classifications.
+
+`POST /api/v1/scripts/templates` builds validated P2SH, P2WPKH, P2WSH, and Taproot locking scripts and mainnet
+addresses from their committed hash or output-key programs.
+
 ## Runtime configuration
 
 The service is safe to run without browser cross-origin access. When the frontend and API use different origins, set

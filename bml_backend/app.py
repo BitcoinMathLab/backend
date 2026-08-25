@@ -23,10 +23,20 @@ from bml_backend.models import (
     P2PKHTraceRequest,
     P2PKHTraceResponse,
     PreviousOutputResponse,
+    StandardScriptTemplateRequest,
+    StandardScriptTemplateResponse,
     TransactionContextResponse,
+    TransactionByteFieldResponse,
+    TransactionExampleResponse,
+    TransactionExamplesResponse,
     TransactionOutputResponse,
 )
+from bml_backend.script_templates import (
+    ScriptTemplateError,
+    create_standard_script_template,
+)
 from bml_backend.service import TraceRequestError, execute_p2pkh_trace
+from bml_backend.transaction_examples import TRANSACTION_EXAMPLES
 
 
 request_logger = logging.getLogger("uvicorn.error.bml_backend.requests")
@@ -35,6 +45,15 @@ _ENVIRONMENT_SOURCE = object()
 
 
 async def trace_request_error_handler(_request: Request, exc: TraceRequestError) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={"error": {"code": exc.code, "message": exc.message}},
+    )
+
+
+async def script_template_error_handler(
+    _request: Request, exc: ScriptTemplateError
+) -> JSONResponse:
     return JSONResponse(
         status_code=422,
         content={"error": {"code": exc.code, "message": exc.message}},
@@ -81,6 +100,12 @@ def parse_release_identifier(raw_release: str) -> str | None:
 
 async def p2pkh_trace(request: P2PKHTraceRequest) -> P2PKHTraceResponse:
     return execute_p2pkh_trace(request)
+
+
+async def standard_script_template(
+    request: StandardScriptTemplateRequest,
+) -> StandardScriptTemplateResponse:
+    return create_standard_script_template(request)
 
 
 async def observe_request(
@@ -190,6 +215,23 @@ def create_app(
             response["release"] = configured_release
         return response
 
+    def transaction_examples() -> TransactionExamplesResponse:
+        return TransactionExamplesResponse(
+            examples=[
+                TransactionExampleResponse(
+                    slug=example.slug,
+                    title=example.title,
+                    description=example.description,
+                    txid=example.txid,
+                    input_count=example.input_count,
+                    output_count=example.output_count,
+                    expected_spend_types=list(example.expected_spend_types),
+                    concepts=list(example.concepts),
+                )
+                for example in TRANSACTION_EXAMPLES
+            ]
+        )
+
     def configured_transaction_context(txid: str) -> TransactionContextResponse:
         if configured_transaction_source is None:
             raise TransactionSourceError(
@@ -197,15 +239,40 @@ def create_app(
                 "Bitcoin Core transaction lookup is not configured.",
             )
         context = configured_transaction_source.load_context(txid)
+        total_input_sats = sum(output.amount_sats for output in context.spent_outputs)
+        total_output_sats = sum(output.amount_sats for output in context.outputs)
         return TransactionContextResponse(
             txid=context.txid,
+            wtxid=context.wtxid,
             transaction_hex=context.transaction_hex,
+            version=context.version,
+            locktime=context.locktime,
+            is_segwit=context.is_segwit,
             is_coinbase=context.is_coinbase,
+            total_input_sats=total_input_sats,
+            total_output_sats=total_output_sats,
+            fee_sats=None if context.is_coinbase else total_input_sats - total_output_sats,
+            size_bytes=context.size_bytes,
+            weight_units=context.weight_units,
+            virtual_size_vbytes=context.virtual_size_vbytes,
+            byte_fields=[
+                TransactionByteFieldResponse(
+                    id=field.id,
+                    label=field.label,
+                    group=field.group,
+                    offset=field.offset,
+                    length=field.length,
+                    hex=field.hex,
+                    decoded=field.decoded,
+                )
+                for field in context.byte_fields
+            ],
             outputs=[
                 TransactionOutputResponse(
                     vout=output.vout,
                     amount_sats=output.amount_sats,
                     script_pubkey_hex=output.script_pubkey_hex,
+                    output_type=output.output_type,
                 )
                 for output in context.outputs
             ],
@@ -236,6 +303,7 @@ def create_app(
     application.middleware("http")(observe_request)
 
     application.add_exception_handler(TraceRequestError, trace_request_error_handler)
+    application.add_exception_handler(ScriptTemplateError, script_template_error_handler)
     application.add_exception_handler(TransactionSourceError, transaction_source_error_handler)
     application.add_exception_handler(RequestValidationError, request_validation_error_handler)
     application.add_api_route(
@@ -248,6 +316,21 @@ def create_app(
         response_model=P2PKHTraceResponse,
         responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
         tags=["traces"],
+    )
+    application.add_api_route(
+        "/api/v1/scripts/templates",
+        standard_script_template,
+        methods=["POST"],
+        response_model=StandardScriptTemplateResponse,
+        responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+        tags=["scripts"],
+    )
+    application.add_api_route(
+        "/api/v1/transactions/examples",
+        transaction_examples,
+        methods=["GET"],
+        response_model=TransactionExamplesResponse,
+        tags=["transactions"],
     )
     application.add_api_route(
         "/api/v1/transactions/{txid}/context",

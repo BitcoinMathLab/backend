@@ -78,12 +78,29 @@ def test_loads_transaction_and_ordered_previous_output_context():
     context = BitcoinCoreTransactionSource(client).load_context(display_txid(target).upper())
 
     assert context.txid == display_txid(target)
+    assert context.wtxid == display_txid(target)
     assert context.transaction_hex == transaction_hex(target)
+    assert context.version == target.version
+    assert context.locktime == target.locktime
+    assert context.is_segwit is False
+    assert context.size_bytes == len(target.to_bytes())
+    assert context.weight_units == target.wu
+    assert context.virtual_size_vbytes == target.vbytes
+    assert isinstance(context.virtual_size_vbytes, int)
+    assert "".join(field.hex for field in context.byte_fields) == context.transaction_hex
+    assert context.byte_fields[0].id == "version"
+    assert context.byte_fields[-1].id == "locktime"
+    assert next(field for field in context.byte_fields if field.id == "input-count").decoded == (
+        "2 (1 byte CompactSize)"
+    )
+    assert next(field for field in context.byte_fields if field.id == "output-0-script-pubkey").decoded == (
+        "1 byte nonstandard or unrecognized locking script"
+    )
     assert context.is_coinbase is False
     assert [
-        (output.vout, output.amount_sats, output.script_pubkey_hex)
+        (output.vout, output.amount_sats, output.script_pubkey_hex, output.output_type)
         for output in context.outputs
-    ] == [(0, 3_500, "51")]
+    ] == [(0, 3_500, "51", None)]
     actual_outputs = [
         (output.vout, output.amount_sats, output.script_pubkey_hex, output.spend_type)
         for output in context.spent_outputs
@@ -119,6 +136,15 @@ def test_aligns_witnesses_with_inputs_to_classify_taproot_paths():
 
     context = BitcoinCoreTransactionSource(client).load_context(display_txid(target))
 
+    assert context.is_segwit is True
+    assert context.wtxid == target.wtxid[::-1].hex()
+    assert context.wtxid != context.txid
+    assert context.size_bytes == len(target.to_bytes())
+    assert context.weight_units == target.wu
+    assert context.virtual_size_vbytes == target.vbytes
+    assert isinstance(context.virtual_size_vbytes, int)
+    assert "".join(field.hex for field in context.byte_fields) == context.transaction_hex
+    assert any(field.group == "witness" for field in context.byte_fields)
     assert [output.spend_type for output in context.spent_outputs] == [
         "P2TR-KEY-PATH",
         "P2WPKH",
@@ -132,10 +158,12 @@ def test_coinbase_context_has_no_previous_outputs():
     context = BitcoinCoreTransactionSource(client).load_context(display_txid(coinbase))
 
     assert context.is_coinbase is True
+    assert context.wtxid == display_txid(coinbase)
+    assert context.is_segwit is False
     assert [
-        (output.vout, output.amount_sats, output.script_pubkey_hex)
+        (output.vout, output.amount_sats, output.script_pubkey_hex, output.output_type)
         for output in context.outputs
-    ] == [(0, 5_000_000_000, "51")]
+    ] == [(0, 5_000_000_000, "51", None)]
     assert context.spent_outputs == ()
 
 
@@ -152,6 +180,7 @@ def test_loads_genesis_coinbase_from_block_zero_when_core_rejects_raw_lookup():
     context = BitcoinCoreTransactionSource(client).load_context(GENESIS_TXID)
 
     assert context.txid == GENESIS_TXID
+    assert context.wtxid == GENESIS_TXID
     assert context.transaction_hex == genesis_block.txs[0].to_bytes().hex()
     assert context.is_coinbase is True
     assert context.spent_outputs == ()

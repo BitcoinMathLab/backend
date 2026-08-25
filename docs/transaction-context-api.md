@@ -9,13 +9,35 @@ ordered previous-output context required to analyze its inputs.
 {
   "api_version": "v1",
   "txid": "<64 lowercase hex characters>",
+  "wtxid": "<64 lowercase hex characters>",
   "transaction_hex": "<canonical serialized transaction>",
+  "version": 2,
+  "locktime": 0,
+  "is_segwit": true,
   "is_coinbase": false,
+  "total_input_sats": 1000010000,
+  "total_output_sats": 1000000000,
+  "fee_sats": 10000,
+  "size_bytes": 223,
+  "weight_units": 562,
+  "virtual_size_vbytes": 141,
+  "byte_fields": [
+    {
+      "id": "version",
+      "label": "Version",
+      "group": "header",
+      "offset": 0,
+      "length": 4,
+      "hex": "02000000",
+      "decoded": "2"
+    }
+  ],
   "outputs": [
     {
       "vout": 0,
       "amount_sats": 1000000000,
-      "script_pubkey_hex": "<locking script>"
+      "script_pubkey_hex": "<locking script>",
+      "output_type": "P2WPKH"
     }
   ],
   "spent_outputs": [
@@ -33,9 +55,21 @@ ordered previous-output context required to analyze its inputs.
 }
 ```
 
-`outputs` contains every output created by the transaction in `vout` order. Previous outputs appear in the same order
+`outputs` contains every output created by the transaction in `vout` order, including the recognized locking-script
+family when one is available. Previous outputs appear in the same order
 as the transaction inputs. Repeated inputs from one previous transaction use one Core lookup. Coinbase transactions
 return `is_coinbase: true` and an empty `spent_outputs` array while still returning their created outputs.
+
+`version`, `locktime`, and `is_segwit` decode the transaction header/serialization format. `wtxid` equals `txid` for
+legacy transactions and identifies the witness-inclusive serialization for SegWit transactions.
+
+`total_input_sats` sums the resolved previous outputs, `total_output_sats` sums the newly created outputs, and
+`fee_sats` is their difference. Coinbase transactions report zero input sats and `fee_sats: null` because their output
+value is a block subsidy plus fees rather than a transaction fee calculation.
+
+`size_bytes`, `weight_units`, and `virtual_size_vbytes` expose the serialized size and SegWit-aware resource metrics.
+`byte_fields` maps every byte of the canonical transaction to an ordered field. Concatenating each field's `hex`
+reconstructs `transaction_hex`; offsets are zero-based and witness fields appear in their serialized position.
 
 Bitcoin Core intentionally excludes the genesis-block coinbase from `getrawtransaction`. For that exact txid, the
 adapter retrieves and verifies block zero, extracts its sole coinbase transaction, and returns the same normal coinbase

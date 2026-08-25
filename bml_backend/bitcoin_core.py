@@ -7,7 +7,7 @@ from typing import Protocol
 from src.block import Block
 from src.database.bitcoin_core_rpc import BitcoinCoreRPCError
 from src.script import classify_spend
-from src.tx import Tx
+from src.tx import Tx, TransactionByteField, inspect_transaction_bytes
 
 
 GENESIS_TXID = "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"
@@ -38,15 +38,24 @@ class TransactionOutputContext:
     vout: int
     amount_sats: int
     script_pubkey_hex: str
+    output_type: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class TransactionContext:
     txid: str
+    wtxid: str
     transaction_hex: str
+    version: int
+    locktime: int
+    is_segwit: bool
     is_coinbase: bool
     outputs: tuple[TransactionOutputContext, ...]
     spent_outputs: tuple[SpentOutputContext, ...]
+    size_bytes: int = 0
+    weight_units: int = 0
+    virtual_size_vbytes: int = 0
+    byte_fields: tuple[TransactionByteField, ...] = ()
 
 
 class TransactionContextSource(Protocol):
@@ -78,6 +87,12 @@ class BitcoinCoreTransactionSource:
                 vout=vout,
                 amount_sats=output.amount,
                 script_pubkey_hex=output.scriptpubkey.hex(),
+                output_type=(
+                    classification.output_type.value
+                    if (classification := classify_spend(output.scriptpubkey)).output_type
+                    is not None
+                    else None
+                ),
             )
             for vout, output in enumerate(transaction.outputs)
         )
@@ -85,10 +100,18 @@ class BitcoinCoreTransactionSource:
         if transaction.is_coinbase:
             return TransactionContext(
                 txid=normalized_txid,
+                wtxid=transaction.wtxid[::-1].hex(),
                 transaction_hex=transaction_hex,
+                version=transaction.version,
+                locktime=transaction.locktime,
+                is_segwit=transaction.is_segwit,
                 is_coinbase=True,
                 outputs=outputs,
                 spent_outputs=(),
+                size_bytes=len(transaction.to_bytes()),
+                weight_units=transaction.wu,
+                virtual_size_vbytes=transaction.vbytes,
+                byte_fields=inspect_transaction_bytes(transaction),
             )
 
         previous_transactions: dict[str, Tx] = {}
@@ -140,10 +163,18 @@ class BitcoinCoreTransactionSource:
 
         return TransactionContext(
             txid=normalized_txid,
+            wtxid=transaction.wtxid[::-1].hex(),
             transaction_hex=transaction_hex,
+            version=transaction.version,
+            locktime=transaction.locktime,
+            is_segwit=transaction.is_segwit,
             is_coinbase=False,
             outputs=outputs,
             spent_outputs=tuple(spent_outputs),
+            size_bytes=len(transaction.to_bytes()),
+            weight_units=transaction.wu,
+            virtual_size_vbytes=transaction.vbytes,
+            byte_fields=inspect_transaction_bytes(transaction),
         )
 
     def _load_transaction(self, txid: str) -> Tx:
