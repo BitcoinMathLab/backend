@@ -43,6 +43,9 @@ still indexing, the endpoint returns a stable HTTP 503 response instead of expos
 authentication is also supported through `BML_CORE_RPC_USER` and `BML_CORE_RPC_PASSWORD`; credentials must never be
 placed in the RPC URL or committed to the repository. `BML_CORE_RPC_TIMEOUT` defaults to 10 seconds.
 
+Each previous output also includes its standard output family and observed spend path. This distinguishes legacy,
+native and nested SegWit, and Taproot key-path/script-path spends without treating classification as script validation.
+
 The genesis-block coinbase is also supported. Because Bitcoin Core intentionally excludes it from
 `getrawtransaction`, the adapter verifies block zero and extracts its sole transaction through a dedicated fallback.
 
