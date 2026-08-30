@@ -49,7 +49,9 @@ ordered previous-output context required to analyze its inputs.
       "output_type": "P2WPKH",
       "spend_type": "P2WPKH",
       "is_nested": false,
-      "redeem_script_hex": null
+      "redeem_script_hex": null,
+      "script_sig_hex": "",
+      "witness_hex": ["<DER signature plus hash type>", "<public key>"]
     }
   ]
 }
@@ -78,6 +80,8 @@ context shape. No other failed transaction lookup uses this fallback.
 `output_type` describes the previous output's locking-script family. `spend_type` additionally distinguishes nested
 P2SH-SegWit and Taproot key/script paths using the spending input. Unsupported or structurally ambiguous data is
 reported as `UNKNOWN`; classification does not replace full script or transaction validation.
+`script_sig_hex` and `witness_hex` preserve the unlocking material aligned with that input. Legacy spends generally use
+the former; native SegWit and Taproot spends use the ordered witness stack. Nested SegWit may use both.
 
 ## Stable errors
 

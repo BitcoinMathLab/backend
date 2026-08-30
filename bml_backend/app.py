@@ -286,6 +286,8 @@ def create_app(
                     spend_type=output.spend_type,
                     is_nested=output.is_nested,
                     redeem_script_hex=output.redeem_script_hex,
+                    script_sig_hex=output.script_sig_hex,
+                    witness_hex=list(output.witness_hex),
                 )
                 for output in context.spent_outputs
             ],

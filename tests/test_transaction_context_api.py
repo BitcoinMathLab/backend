@@ -67,6 +67,7 @@ async def test_returns_versioned_transaction_and_spent_output_context():
                     script_pubkey_hex="76a914" + "33" * 20 + "88ac",
                     output_type="P2PKH",
                     spend_type="P2PKH",
+                    script_sig_hex="483045",
                 ),
             ),
             size_bytes=225,
@@ -132,6 +133,8 @@ async def test_returns_versioned_transaction_and_spent_output_context():
                 "spend_type": "P2PKH",
                 "is_nested": False,
                 "redeem_script_hex": None,
+                "script_sig_hex": "483045",
+                "witness_hex": [],
             }
         ],
     }

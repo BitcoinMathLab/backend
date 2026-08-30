@@ -109,6 +109,8 @@ def test_loads_transaction_and_ordered_previous_output_context():
         (1, 2_500, "76a914" + "11" * 20 + "88ac", "P2PKH"),
         (0, 1_500, "51", "UNKNOWN"),
     ]
+    assert [output.script_sig_hex for output in context.spent_outputs] == ["51", "51"]
+    assert [output.witness_hex for output in context.spent_outputs] == [(), ()]
     assert client.calls[display_txid(previous)] == 1
 
 
@@ -149,6 +151,10 @@ def test_aligns_witnesses_with_inputs_to_classify_taproot_paths():
         "P2TR-KEY-PATH",
         "P2WPKH",
     ]
+    assert context.spent_outputs[0].witness_hex == ((b"\x33" * 64).hex(),)
+    assert context.spent_outputs[1].witness_hex == tuple(
+        item.hex() for item in (b"signature", b"public key")
+    )
 
 
 def test_coinbase_context_has_no_previous_outputs():

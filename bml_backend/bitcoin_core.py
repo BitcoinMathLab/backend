@@ -31,6 +31,8 @@ class SpentOutputContext:
     spend_type: str = "UNKNOWN"
     is_nested: bool = False
     redeem_script_hex: str | None = None
+    script_sig_hex: str = ""
+    witness_hex: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +160,8 @@ class BitcoinCoreTransactionSource:
                         if classification.redeem_script is not None
                         else None
                     ),
+                    script_sig_hex=transaction_input.scriptsig.hex(),
+                    witness_hex=tuple(item.hex() for item in witness),
                 )
             )
 

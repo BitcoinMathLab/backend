@@ -146,6 +146,8 @@ class PreviousOutputResponse(APIModel):
     redeem_script_hex: str | None = Field(
         default=None, pattern=r"^(?:[0-9a-f]{2})+$", max_length=20_000
     )
+    script_sig_hex: str = Field(pattern=r"^(?:[0-9a-f]{2})*$", max_length=20_000)
+    witness_hex: list[str] = Field(max_length=1_000)
 
 
 class TransactionOutputResponse(APIModel):
