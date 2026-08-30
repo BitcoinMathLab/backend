@@ -13,6 +13,14 @@ TRANSACTION_HEX = (
     "2831ac88ac14206c00000000001976a914d807ded709af8893f02cdc30a37994429fa248ca88ac751a0600"
 )
 LOCKING_SCRIPT_HEX = "76a91455ae51684c43435da751ac8d2173b2652eb6410588ac"
+P2WPKH_TRANSACTION_HEX = (
+    "020000000001013aa815ace3c5751ee6c325d614044ad58c18ed2858a44f9d9f98fbcddad878c1"
+    "0000000000ffffffff01344d10000000000016001430cd68883f558464ec7939d9f960956422018f"
+    "0702483045022100c7fb3bd38bdceb315a28a0793d85f31e4e1d9983122b4a5de741d6ddca5caf"
+    "8202207b2821abd7a1a2157a9d5e69d2fdba3502b0a96be809c34981f8445555bdafdb012103f4"
+    "65315805ed271eb972e43d84d2a9e19494d10151d9f6adb32b8534bfd764ab00000000"
+)
+P2WPKH_LOCKING_SCRIPT_HEX = "0014841b80d2cc75f5345c482af96294d04fdd66b2b7"
 
 
 def request_body(*, transaction_hex=TRANSACTION_HEX, locking_script_hex=LOCKING_SCRIPT_HEX):
@@ -90,6 +98,50 @@ async def test_trace_known_valid_p2pkh_spend():
         "OP_PUSHBYTES_20",
         "OP_EQUALVERIFY",
         "OP_CHECKSIG",
+    ]
+
+
+async def test_trace_known_valid_native_p2wpkh_spend():
+    response = await api_request(
+        "POST",
+        "/api/v1/traces/p2wpkh",
+        json={
+            "transaction_hex": P2WPKH_TRANSACTION_HEX,
+            "input_index": 0,
+            "spent_outputs": [{
+                "amount_sats": 1_083_200,
+                "script_pubkey_hex": P2WPKH_LOCKING_SCRIPT_HEX,
+            }],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["script_type"] == "P2WPKH"
+    assert payload["scripts"]["locking"] == P2WPKH_LOCKING_SCRIPT_HEX
+    assert payload["scripts"]["script_code"] == (
+        "76a914841b80d2cc75f5345c482af96294d04fdd66b2b788ac"
+    )
+    assert len(payload["scripts"]["witness"]) == 2
+    assert payload["signature"] == {
+        "algorithm": "ECDSA/secp256k1",
+        "signature_hex": payload["scripts"]["witness"][0][:-2],
+        "public_key_hex": payload["scripts"]["witness"][1],
+        "sighash_type": 1,
+        "sighash_label": "SIGHASH_ALL",
+        "preimage_hex": payload["signature"]["preimage_hex"],
+        "digest_hex": "e4ce544b38c694f09ca943f9a53a9051c981a81177fc0f9d689e2873c5e95270",
+        "valid": True,
+        "hash_prevouts_hex": "d409ff70f88bfdf4f82f201b99df100cc56466165688acf203d4fd6a7173e8bc",
+        "hash_sequence_hex": "3bb13029ce7b1f559ef5e747fcac439f1455a2ec7c5f09b72290795e70665044",
+        "hash_outputs_hex": "59d2c073a8f9790f052fe8da122d2de40b1d5646e32f5512e3fb2c46023dd9f4",
+        "script_code_hex": "1976a914841b80d2cc75f5345c482af96294d04fdd66b2b788ac",
+        "amount_sats": 1_083_200,
+    }
+    assert payload["trace"]["success"] is True
+    assert payload["trace"]["steps"][0]["stacks"]["before"]["main"]["depth"] == 2
+    assert [step["opcode"]["name"] for step in payload["trace"]["steps"]] == [
+        "OP_DUP", "OP_HASH160", "OP_PUSHBYTES_20", "OP_EQUALVERIFY", "OP_CHECKSIG"
     ]
 
 
@@ -198,4 +250,8 @@ async def test_openapi_publishes_versioned_trace_contract():
     )
     assert operation["responses"]["422"]["content"]["application/json"]["schema"]["$ref"].endswith(
         "/ErrorResponse"
+    )
+    witness_operation = document["paths"]["/api/v1/traces/p2wpkh"]["post"]
+    assert witness_operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/P2WPKHTraceResponse"
     )

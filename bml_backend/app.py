@@ -22,6 +22,7 @@ from bml_backend.models import (
     ErrorResponse,
     P2PKHTraceRequest,
     P2PKHTraceResponse,
+    P2WPKHTraceResponse,
     PreviousOutputResponse,
     StandardScriptTemplateRequest,
     StandardScriptTemplateResponse,
@@ -35,7 +36,7 @@ from bml_backend.script_templates import (
     ScriptTemplateError,
     create_standard_script_template,
 )
-from bml_backend.service import TraceRequestError, execute_p2pkh_trace
+from bml_backend.service import TraceRequestError, execute_p2pkh_trace, execute_p2wpkh_trace
 from bml_backend.transaction_examples import TRANSACTION_EXAMPLES
 
 
@@ -100,6 +101,10 @@ def parse_release_identifier(raw_release: str) -> str | None:
 
 async def p2pkh_trace(request: P2PKHTraceRequest) -> P2PKHTraceResponse:
     return execute_p2pkh_trace(request)
+
+
+async def p2wpkh_trace(request: P2PKHTraceRequest) -> P2WPKHTraceResponse:
+    return execute_p2wpkh_trace(request)
 
 
 async def standard_script_template(
@@ -316,6 +321,14 @@ def create_app(
         p2pkh_trace,
         methods=["POST"],
         response_model=P2PKHTraceResponse,
+        responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+        tags=["traces"],
+    )
+    application.add_api_route(
+        "/api/v1/traces/p2wpkh",
+        p2wpkh_trace,
+        methods=["POST"],
+        response_model=P2WPKHTraceResponse,
         responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
         tags=["traces"],
     )

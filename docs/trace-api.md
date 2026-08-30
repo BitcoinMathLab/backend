@@ -1,8 +1,13 @@
-# P2PKH Trace API
+# P2PKH and P2WPKH Trace API
 
 ## Endpoint
 
 `POST /api/v1/traces/p2pkh` validates and traces one legacy P2PKH transaction input.
+
+`POST /api/v1/traces/p2wpkh` accepts the same request shape and validates a native SegWit-v0 P2WPKH input. Its
+`scriptSig` must be empty and its witness must contain exactly the DER signature/hash-type item and compressed public
+key. The trace begins with those real witness items on the stack and executes the P2PKH `scriptCode` derived from the
+20-byte witness program.
 
 ```json
 {
@@ -34,6 +39,10 @@ Both successful execution and normal Bitcoin Script failure return HTTP 200. The
 The preimage is the exact byte sequence hashed by the legacy signature algorithm: all input scripts are cleared, the
 selected input receives the spent output's `scriptPubKey`, and the four-byte sighash type is appended. It contains only
 public transaction data and is suitable for an educational byte walkthrough.
+
+For P2WPKH, the response additionally exposes the witness items, witness program, derived serialized `scriptCode`,
+spent amount, `hashPrevouts`, `hashSequence`, and `hashOutputs`. The preimage and digest follow BIP143 and respect the
+selected `SIGHASH` and `ANYONECANPAY` commitments.
 
 Normal failures use `trace.success: false`. This lets the visualizer teach a failed signature or script without treating
 the lesson itself as a failed HTTP request.

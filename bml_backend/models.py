@@ -135,6 +135,35 @@ class P2PKHTraceResponse(APIModel):
     trace: ExecutionTraceResponse
 
 
+class P2WPKHScriptsResponse(APIModel):
+    witness: list[str] = Field(min_length=2, max_length=2)
+    locking: str = Field(pattern=r"^0014[0-9a-f]{40}$")
+    script_code: str = Field(pattern=r"^76a914[0-9a-f]{40}88ac$")
+
+
+class P2WPKHTraceSourcesResponse(APIModel):
+    witness: ScriptSourceResponse
+    script_pubkey: ScriptSourceResponse
+
+
+class SegwitV0SignatureVerificationResponse(SignatureVerificationResponse):
+    hash_prevouts_hex: str = Field(pattern=r"^[0-9a-f]{64}$")
+    hash_sequence_hex: str = Field(pattern=r"^[0-9a-f]{64}$")
+    hash_outputs_hex: str = Field(pattern=r"^[0-9a-f]{64}$")
+    script_code_hex: str = Field(pattern=r"^(?:[0-9a-f]{2})+$")
+    amount_sats: int = Field(ge=0, le=2_100_000_000_000_000)
+
+
+class P2WPKHTraceResponse(APIModel):
+    api_version: Literal["v1"] = "v1"
+    script_type: Literal["P2WPKH"] = "P2WPKH"
+    input_index: int = Field(ge=0)
+    scripts: P2WPKHScriptsResponse
+    sources: P2WPKHTraceSourcesResponse
+    signature: SegwitV0SignatureVerificationResponse
+    trace: ExecutionTraceResponse
+
+
 class PreviousOutputResponse(APIModel):
     txid: str = Field(pattern=r"^[0-9a-f]{64}$")
     vout: int = Field(ge=0, le=0xFFFFFFFF)
