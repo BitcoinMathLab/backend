@@ -26,8 +26,14 @@ Both successful execution and normal Bitcoin Script failure return HTTP 200. The
 
 - `api_version: "v1"` for the HTTP contract;
 - `script_type: "P2PKH"` and the selected input index;
-- the unlocking, locking, and combined serialized scripts; and
+- the unlocking, locking, and combined serialized scripts;
+- the spending-input and previous-output transaction provenance;
+- the DER signature, public key, sighash type, exact legacy preimage, double-SHA-256 digest, and ECDSA result; and
 - the schema-versioned Bitclone trace with ordered steps, stack snapshots, explanations, outcome, and safe diagnostic.
+
+The preimage is the exact byte sequence hashed by the legacy signature algorithm: all input scripts are cleared, the
+selected input receives the spent output's `scriptPubKey`, and the four-byte sighash type is appended. It contains only
+public transaction data and is suitable for an educational byte walkthrough.
 
 Normal failures use `trace.success: false`. This lets the visualizer teach a failed signature or script without treating
 the lesson itself as a failed HTTP request.

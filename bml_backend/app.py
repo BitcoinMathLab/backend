@@ -215,7 +215,7 @@ def create_app(
             response["release"] = configured_release
         return response
 
-    def transaction_examples() -> TransactionExamplesResponse:
+    async def transaction_examples() -> TransactionExamplesResponse:
         return TransactionExamplesResponse(
             examples=[
                 TransactionExampleResponse(
@@ -232,7 +232,7 @@ def create_app(
             ]
         )
 
-    def configured_transaction_context(txid: str) -> TransactionContextResponse:
+    async def configured_transaction_context(txid: str) -> TransactionContextResponse:
         if configured_transaction_source is None:
             raise TransactionSourceError(
                 "bitcoin-core-not-configured",

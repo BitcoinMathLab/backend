@@ -104,11 +104,34 @@ class ScriptPairResponse(APIModel):
     combined: str
 
 
+class ScriptSourceResponse(APIModel):
+    transaction_txid: str = Field(pattern=r"^[0-9a-f]{64}$")
+    index: int = Field(ge=0, le=0xFFFFFFFF)
+
+
+class TraceSourcesResponse(APIModel):
+    script_sig: ScriptSourceResponse
+    script_pubkey: ScriptSourceResponse
+
+
+class SignatureVerificationResponse(APIModel):
+    algorithm: Literal["ECDSA/secp256k1"]
+    signature_hex: str = Field(pattern=r"^(?:[0-9a-f]{2})+$")
+    public_key_hex: str = Field(pattern=r"^(?:[0-9a-f]{2})+$")
+    sighash_type: int = Field(ge=0, le=255)
+    sighash_label: str
+    preimage_hex: str = Field(pattern=r"^(?:[0-9a-f]{2})+$", max_length=800_008)
+    digest_hex: str = Field(pattern=r"^[0-9a-f]{64}$")
+    valid: bool
+
+
 class P2PKHTraceResponse(APIModel):
     api_version: Literal["v1"] = "v1"
     script_type: Literal["P2PKH"] = "P2PKH"
     input_index: int = Field(ge=0)
     scripts: ScriptPairResponse
+    sources: TraceSourcesResponse
+    signature: SignatureVerificationResponse
     trace: ExecutionTraceResponse
 
 

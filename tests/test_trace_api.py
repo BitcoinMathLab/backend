@@ -57,6 +57,26 @@ async def test_trace_known_valid_p2pkh_spend():
     assert payload["api_version"] == "v1"
     assert payload["script_type"] == "P2PKH"
     assert payload["input_index"] == 0
+    assert payload["sources"] == {
+        "script_sig": {
+            "transaction_txid": "40e331b67c0fe7750bb3b1943b378bf702dce86124dc12fa5980f975db7ec930",
+            "index": 0,
+        },
+        "script_pubkey": {
+            "transaction_txid": "0b6461de422c46a221db99608fcbe0326e4f2325ebf2a47c9faf660ed61ee6a4",
+            "index": 1,
+        },
+    }
+    assert payload["signature"] == {
+        "algorithm": "ECDSA/secp256k1",
+        "signature_hex": "3045022100c233c3a8a510e03ad18b0a24694ef00c78101bfd5ac075b8c1037952ce26e91e02205aa5f8f88f29bb4ad5808ebc12abfd26bd791256f367b04c6d955f01f28a7724",
+        "public_key_hex": "03f0609c81a45f8cab67fc2d050c21b1acd3d37c7acfd54041be6601ab4cef4f31",
+        "sighash_type": 1,
+        "sighash_label": "SIGHASH_ALL",
+        "preimage_hex": "0100000001a4e61ed60e66af9f7ca4f2eb25234f6e32e0cb8f6099db21a2462c42de61640b010000001976a91455ae51684c43435da751ac8d2173b2652eb6410588acfeffffff02f9243751130000001976a9140c443537e6e31f06e6edb2d4bb80f8481e2831ac88ac14206c00000000001976a914d807ded709af8893f02cdc30a37994429fa248ca88ac751a060001000000",
+        "digest_hex": "d21483940571a138f8c768a97f1002cc6b6b0c4df9f647feb513b881162d66e6",
+        "valid": True,
+    }
     assert payload["scripts"]["locking"] == LOCKING_SCRIPT_HEX
     assert payload["scripts"]["combined"] == payload["trace"]["script"]
     assert payload["trace"]["schema_version"] == 1

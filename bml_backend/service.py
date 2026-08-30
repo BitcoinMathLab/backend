@@ -3,7 +3,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.script import P2PKHTraceResult, trace_p2pkh_spend
+from src.script import (
+    P2PKHTraceResult,
+    get_legacy_sighash,
+    get_legacy_sighash_preimage,
+    trace_p2pkh_spend,
+    verify_ecdsa_sig,
+)
 from src.tx import Tx, UTXO
 
 from bml_backend.models import (
@@ -12,11 +18,14 @@ from bml_backend.models import (
     P2PKHTraceRequest,
     P2PKHTraceResponse,
     ScriptPairResponse,
+    ScriptSourceResponse,
+    SignatureVerificationResponse,
     StackPairResponse,
     StackSnapshotResponse,
     StepStacksResponse,
     TraceDiagnosticResponse,
     TraceStepResponse,
+    TraceSourcesResponse,
 )
 
 
@@ -47,7 +56,39 @@ def _snapshot_response(snapshot) -> StackSnapshotResponse:
     )
 
 
-def _result_response(result: P2PKHTraceResult) -> P2PKHTraceResponse:
+def _sighash_label(value: int) -> str:
+    return {1: "SIGHASH_ALL", 2: "SIGHASH_NONE", 3: "SIGHASH_SINGLE"}.get(
+        value & 0x1F, f"SIGHASH_{value:02X}"
+    ) + (" | ANYONECANPAY" if value & 0x80 else "")
+
+
+def _signature_response(result: P2PKHTraceResult, tx: Tx) -> SignatureVerificationResponse:
+    pushes = [step.opcode.push_data for step in result.trace.steps if step.opcode.is_push]
+    if len(pushes) < 2 or not pushes[0] or not pushes[1]:
+        raise TraceRequestError("invalid-unlocking-script", "P2PKH scriptSig must push a signature and public key.")
+
+    signature_with_type = pushes[0] if isinstance(pushes[0], bytes) else bytes.fromhex(pushes[0])
+    public_key = pushes[1] if isinstance(pushes[1], bytes) else bytes.fromhex(pushes[1])
+    sighash_type = signature_with_type[-1]
+    digest = get_legacy_sighash(
+        tx, result.input_index, result.locking_script, sighash_type
+    )
+    preimage = get_legacy_sighash_preimage(
+        tx, result.input_index, result.locking_script, sighash_type
+    )
+    return SignatureVerificationResponse(
+        algorithm="ECDSA/secp256k1",
+        signature_hex=signature_with_type[:-1].hex(),
+        public_key_hex=public_key.hex(),
+        sighash_type=sighash_type,
+        sighash_label=_sighash_label(sighash_type),
+        preimage_hex=preimage.hex(),
+        digest_hex=digest.hex(),
+        valid=verify_ecdsa_sig(signature_with_type[:-1], digest, public_key),
+    )
+
+
+def _result_response(result: P2PKHTraceResult, tx: Tx) -> P2PKHTraceResponse:
     steps = []
     for step in result.trace.steps:
         steps.append(TraceStepResponse(
@@ -74,6 +115,16 @@ def _result_response(result: P2PKHTraceResult) -> P2PKHTraceResponse:
             locking=result.locking_script.hex(),
             combined=result.combined_script.hex(),
         ),
+        sources=TraceSourcesResponse(
+            script_sig=ScriptSourceResponse(
+                transaction_txid=tx.txid[::-1].hex(), index=result.input_index
+            ),
+            script_pubkey=ScriptSourceResponse(
+                transaction_txid=tx.inputs[result.input_index].txid[::-1].hex(),
+                index=tx.inputs[result.input_index].vout,
+            ),
+        ),
+        signature=_signature_response(result, tx),
         trace=ExecutionTraceResponse(
             schema_version=result.trace.SCHEMA_VERSION,
             script=result.trace.script.hex(),
@@ -136,4 +187,4 @@ def execute_p2pkh_trace(request: P2PKHTraceRequest) -> P2PKHTraceResponse:
             "Bitclone could not execute the supplied P2PKH spend context.",
         ) from exc
 
-    return _result_response(result)
+    return _result_response(result, tx)
