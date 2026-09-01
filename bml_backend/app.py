@@ -19,6 +19,8 @@ from bml_backend import __version__
 from bml_backend.bitcoin_core import TransactionContextSource, TransactionSourceError
 from bml_backend.config import transaction_source_from_environment
 from bml_backend.models import (
+    ECDSASignatureVerificationRequest,
+    ECDSASignatureVerificationResponse,
     ErrorResponse,
     P2PKHTraceRequest,
     P2PKHTraceResponse,
@@ -36,7 +38,12 @@ from bml_backend.script_templates import (
     ScriptTemplateError,
     create_standard_script_template,
 )
-from bml_backend.service import TraceRequestError, execute_p2pkh_trace, execute_p2wpkh_trace
+from bml_backend.service import (
+    TraceRequestError,
+    execute_ecdsa_signature_verification,
+    execute_p2pkh_trace,
+    execute_p2wpkh_trace,
+)
 from bml_backend.transaction_examples import TRANSACTION_EXAMPLES
 
 
@@ -105,6 +112,12 @@ async def p2pkh_trace(request: P2PKHTraceRequest) -> P2PKHTraceResponse:
 
 async def p2wpkh_trace(request: P2PKHTraceRequest) -> P2WPKHTraceResponse:
     return execute_p2wpkh_trace(request)
+
+
+async def verify_ecdsa_signature(
+    request: ECDSASignatureVerificationRequest,
+) -> ECDSASignatureVerificationResponse:
+    return execute_ecdsa_signature_verification(request)
 
 
 async def standard_script_template(
@@ -331,6 +344,14 @@ def create_app(
         response_model=P2WPKHTraceResponse,
         responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
         tags=["traces"],
+    )
+    application.add_api_route(
+        "/api/v1/signatures/ecdsa/verify",
+        verify_ecdsa_signature,
+        methods=["POST"],
+        response_model=ECDSASignatureVerificationResponse,
+        responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+        tags=["signatures"],
     )
     application.add_api_route(
         "/api/v1/scripts/templates",

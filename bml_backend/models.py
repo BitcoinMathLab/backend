@@ -49,6 +49,15 @@ class P2PKHTraceRequest(APIModel):
         return value.lower()
 
 
+class ECDSASignatureVerificationRequest(P2PKHTraceRequest):
+    der_signature_hex: HexString = Field(min_length=16, max_length=144)
+
+    @field_validator("der_signature_hex")
+    @classmethod
+    def normalize_signature_hex(cls, value: str) -> str:
+        return value.lower()
+
+
 class StackSnapshotResponse(APIModel):
     depth: int = Field(ge=0)
     items: list[str]
@@ -162,6 +171,15 @@ class P2WPKHTraceResponse(APIModel):
     sources: P2WPKHTraceSourcesResponse
     signature: SegwitV0SignatureVerificationResponse
     trace: ExecutionTraceResponse
+
+
+class ECDSASignatureVerificationResponse(APIModel):
+    api_version: Literal["v1"] = "v1"
+    script_type: Literal["P2PKH", "P2WPKH"]
+    input_index: int = Field(ge=0)
+    scripts: ScriptPairResponse | P2WPKHScriptsResponse
+    sources: TraceSourcesResponse | P2WPKHTraceSourcesResponse
+    signature: SignatureVerificationResponse | SegwitV0SignatureVerificationResponse
 
 
 class PreviousOutputResponse(APIModel):

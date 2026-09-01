@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from src.script import (
+    ECDSASignatureVerificationResult,
     P2PKHTraceResult,
     P2WPKHTraceResult,
     get_legacy_sighash,
@@ -13,11 +14,14 @@ from src.script import (
     trace_p2pkh_spend,
     trace_p2wpkh_spend,
     verify_ecdsa_sig,
+    verify_input_ecdsa_signature,
 )
 from src.core import serialize_data
 from src.tx import Tx, UTXO
 
 from bml_backend.models import (
+    ECDSASignatureVerificationRequest,
+    ECDSASignatureVerificationResponse,
     ExecutionTraceResponse,
     OpcodeResponse,
     P2PKHTraceRequest,
@@ -178,6 +182,132 @@ def _p2wpkh_signature_response(
         hash_outputs_hex=preimage[-40:-8].hex(),
         script_code_hex=serialized_script_code.hex(),
         amount_sats=amount_sats,
+    )
+
+
+def _candidate_signature_response(
+    result: ECDSASignatureVerificationResult,
+) -> SignatureVerificationResponse | SegwitV0SignatureVerificationResponse:
+    common = {
+        "algorithm": "ECDSA/secp256k1",
+        "signature_hex": result.signature.hex(),
+        "public_key_hex": result.public_key.hex(),
+        "sighash_type": result.sighash_type,
+        "sighash_label": _sighash_label(result.sighash_type),
+        "preimage_hex": result.preimage.hex(),
+        "digest_hex": result.digest.hex(),
+        "valid": result.valid,
+    }
+    if result.script_type == "P2WPKH":
+        if result.script_code is None or result.amount is None:  # pragma: no cover - engine invariant
+            raise RuntimeError("P2WPKH signature verification context is incomplete")
+        return SegwitV0SignatureVerificationResponse(
+            **common,
+            hash_prevouts_hex=result.preimage[4:36].hex(),
+            hash_sequence_hex=result.preimage[36:68].hex(),
+            hash_outputs_hex=result.preimage[-40:-8].hex(),
+            script_code_hex=serialize_data(result.script_code).hex(),
+            amount_sats=result.amount,
+        )
+    return SignatureVerificationResponse(**common)
+
+
+def execute_ecdsa_signature_verification(
+    request: ECDSASignatureVerificationRequest,
+) -> ECDSASignatureVerificationResponse:
+    raw_transaction = bytes.fromhex(request.transaction_hex)
+    try:
+        tx = Tx.from_bytes(raw_transaction)
+    except Exception as exc:
+        raise TraceRequestError(
+            "invalid-transaction",
+            "transaction_hex is not a complete serialized Bitcoin transaction.",
+        ) from exc
+    if tx.to_bytes() != raw_transaction:
+        raise TraceRequestError(
+            "invalid-transaction",
+            "transaction_hex contains trailing or non-canonical transaction data.",
+        )
+    if request.input_index >= len(tx.inputs):
+        raise TraceRequestError(
+            "input-index-out-of-range",
+            "input_index does not identify an input in the transaction.",
+        )
+    if len(request.spent_outputs) != len(tx.inputs):
+        raise TraceRequestError(
+            "spent-output-count",
+            "spent_outputs must contain exactly one item for every transaction input.",
+        )
+
+    spent_outputs = [
+        UTXO(
+            outpoint=tx.inputs[index].outpoint,
+            amount=descriptor.amount_sats,
+            scriptpubkey=bytes.fromhex(descriptor.script_pubkey_hex),
+            block_height=0,
+        )
+        for index, descriptor in enumerate(request.spent_outputs)
+    ]
+    try:
+        result = verify_input_ecdsa_signature(
+            tx,
+            request.input_index,
+            spent_outputs,
+            bytes.fromhex(request.der_signature_hex),
+        )
+    except ValueError as exc:
+        message = str(exc)
+        if "strict DER" in message:
+            code = "invalid-der-signature"
+            message = "der_signature_hex is not a strict DER-encoded ECDSA signature."
+        elif "not P2PKH or native P2WPKH" in message:
+            code = "unsupported-script-type"
+        elif "scriptSig" in message or "witness" in message or "public key" in message:
+            code = "invalid-unlocking-data"
+        else:
+            code = "invalid-spend-context"
+        raise TraceRequestError(code, message) from exc
+    except Exception as exc:
+        raise TraceRequestError(
+            "verification-error",
+            "Bitclone could not verify the supplied ECDSA signature.",
+        ) from exc
+
+    source_txid = tx.txid[::-1].hex()
+    previous_source = ScriptSourceResponse(
+        transaction_txid=tx.inputs[result.input_index].txid[::-1].hex(),
+        index=tx.inputs[result.input_index].vout,
+    )
+    if result.script_type == "P2WPKH":
+        if result.script_code is None:  # pragma: no cover - engine invariant
+            raise RuntimeError("P2WPKH signature verification scriptCode is missing")
+        scripts = P2WPKHScriptsResponse(
+            witness=[item.hex() for item in result.witness],
+            locking=result.locking_script.hex(),
+            script_code=result.script_code.hex(),
+        )
+        sources = P2WPKHTraceSourcesResponse(
+            witness=ScriptSourceResponse(transaction_txid=source_txid, index=result.input_index),
+            script_pubkey=previous_source,
+        )
+    else:
+        scripts = ScriptPairResponse(
+            unlocking=result.unlocking_script.hex(),
+            locking=result.locking_script.hex(),
+            combined=(result.unlocking_script + result.locking_script).hex(),
+        )
+        sources = TraceSourcesResponse(
+            script_sig=ScriptSourceResponse(
+                transaction_txid=source_txid, index=result.input_index
+            ),
+            script_pubkey=previous_source,
+        )
+    return ECDSASignatureVerificationResponse(
+        script_type=result.script_type,
+        input_index=result.input_index,
+        scripts=scripts,
+        sources=sources,
+        signature=_candidate_signature_response(result),
     )
 
 

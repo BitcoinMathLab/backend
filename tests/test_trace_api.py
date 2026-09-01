@@ -2,6 +2,7 @@ import httpx
 import pytest
 
 from bml_backend.app import app
+from src.data import decode_der_signature, encode_der_signature
 from src.tx import Tx
 
 
@@ -164,6 +165,91 @@ async def test_invalid_signature_is_a_normal_failure_trace():
     assert "exception_type" not in str(payload)
 
 
+async def test_verifies_a_candidate_der_signature_against_legacy_transaction_context():
+    tx = Tx.from_bytes(bytes.fromhex(TRANSACTION_HEX))
+    signature_length = tx.inputs[0].scriptsig[0]
+    der_signature = tx.inputs[0].scriptsig[1:signature_length]
+    body = request_body()
+    body["der_signature_hex"] = der_signature.hex()
+
+    response = await api_request(
+        "POST", "/api/v1/signatures/ecdsa/verify", json=body
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["api_version"] == "v1"
+    assert payload["script_type"] == "P2PKH"
+    assert payload["input_index"] == 0
+    assert payload["signature"]["signature_hex"] == der_signature.hex()
+    assert payload["signature"]["digest_hex"] == (
+        "d21483940571a138f8c768a97f1002cc6b6b0c4df9f647feb513b881162d66e6"
+    )
+    assert payload["signature"]["valid"] is True
+    assert payload["sources"]["script_pubkey"]["index"] == 1
+
+
+async def test_valid_but_wrong_der_signature_returns_a_normal_invalid_result():
+    tx = Tx.from_bytes(bytes.fromhex(TRANSACTION_HEX))
+    signature_length = tx.inputs[0].scriptsig[0]
+    original = tx.inputs[0].scriptsig[1:signature_length]
+    r, s = decode_der_signature(original)
+    body = request_body()
+    body["der_signature_hex"] = encode_der_signature(r, s + 1).hex()
+
+    response = await api_request(
+        "POST", "/api/v1/signatures/ecdsa/verify", json=body
+    )
+
+    assert response.status_code == 200
+    assert response.json()["signature"]["valid"] is False
+
+
+async def test_verifies_a_candidate_der_signature_against_bip143_context():
+    tx = Tx.from_bytes(bytes.fromhex(P2WPKH_TRANSACTION_HEX))
+    body = {
+        "transaction_hex": P2WPKH_TRANSACTION_HEX,
+        "input_index": 0,
+        "spent_outputs": [
+            {
+                "amount_sats": 1_083_200,
+                "script_pubkey_hex": P2WPKH_LOCKING_SCRIPT_HEX,
+            }
+        ],
+        "der_signature_hex": tx.witness[0].items[0][:-1].hex(),
+    }
+
+    response = await api_request(
+        "POST", "/api/v1/signatures/ecdsa/verify", json=body
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["script_type"] == "P2WPKH"
+    assert payload["signature"]["valid"] is True
+    assert payload["signature"]["amount_sats"] == 1_083_200
+    assert payload["signature"]["digest_hex"] == (
+        "e4ce544b38c694f09ca943f9a53a9051c981a81177fc0f9d689e2873c5e95270"
+    )
+
+
+async def test_rejects_malformed_der_with_a_stable_safe_error():
+    body = request_body()
+    body["der_signature_hex"] = "3000000000000000"
+
+    response = await api_request(
+        "POST", "/api/v1/signatures/ecdsa/verify", json=body
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {
+            "code": "invalid-der-signature",
+            "message": "der_signature_hex is not a strict DER-encoded ECDSA signature.",
+        }
+    }
+
+
 async def test_request_validation_has_stable_safe_shape():
     response = await api_request(
         "POST",
@@ -255,3 +341,7 @@ async def test_openapi_publishes_versioned_trace_contract():
     assert witness_operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
         "/P2WPKHTraceResponse"
     )
+    verification_operation = document["paths"]["/api/v1/signatures/ecdsa/verify"]["post"]
+    assert verification_operation["responses"]["200"]["content"]["application/json"]["schema"][
+        "$ref"
+    ].endswith("/ECDSASignatureVerificationResponse")
