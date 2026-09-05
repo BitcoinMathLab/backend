@@ -22,6 +22,21 @@ P2WPKH_TRANSACTION_HEX = (
     "65315805ed271eb972e43d84d2a9e19494d10151d9f6adb32b8534bfd764ab00000000"
 )
 P2WPKH_LOCKING_SCRIPT_HEX = "0014841b80d2cc75f5345c482af96294d04fdd66b2b7"
+P2MS_TRANSACTION_HEX = (
+    "010000000110a5fee9786a9d2d72c25525e52dd70cbd9035d5152fac83b62d3aa7e2301d580000000093"
+    "00483045022100af204ef91b8dba5884df50f87219ccef22014c21dd05aa44470d4ed800b7f6e4022042"
+    "8fe058684db1bb2bfb6061bff67048592c574effc217f0d150daedcf36787601483045022100e8547aa2c"
+    "2a2761a5a28806d3ae0d1bbf0aeff782f9081dfea67b86cacb321340220771a166929469c34959daf726a"
+    "2ac0c253f9aff391e58a3c7cb46d8b7e0fdc4801ffffffff0180a21900000000001976a914971802edf585"
+    "cdbc4e57017d6e5142515c1e502888ac00000000"
+)
+P2MS_LOCKING_SCRIPT_HEX = (
+    "524104d81fd577272bbe73308c93009eec5dc9fc319fc1ee2e7066e17220a5d47a18314578be2faea34b9"
+    "f1f8ca078f8621acd4bc22897b03daa422b9bf56646b342a24104ec3afff0b2b66e8152e9018fe3be3fc9"
+    "2b30bf886b3487a525997d00fd9da2d012dce5d5275854adc3106572a5d1e12d4211b228429f5a7b2f7b"
+    "a92eb0475bb14104b49b496684b02855bc32f5daefa2e2e406db4418f3b86bca5195600951c7d918cdbe5"
+    "e6d3736ec2abf2dd7610995c3086976b2c0c7b4e459d10b34a316d5a5e753ae"
+)
 
 
 def request_body(*, transaction_hex=TRANSACTION_HEX, locking_script_hex=LOCKING_SCRIPT_HEX):
@@ -144,6 +159,77 @@ async def test_trace_known_valid_native_p2wpkh_spend():
     assert [step["opcode"]["name"] for step in payload["trace"]["steps"]] == [
         "OP_DUP", "OP_HASH160", "OP_PUSHBYTES_20", "OP_EQUALVERIFY", "OP_CHECKSIG"
     ]
+
+
+async def test_trace_known_valid_bare_p2ms_spend():
+    response = await api_request(
+        "POST",
+        "/api/v1/traces/p2ms",
+        json={
+            "transaction_hex": P2MS_TRANSACTION_HEX,
+            "input_index": 0,
+            "spent_outputs": [{
+                "amount_sats": 1_690_000,
+                "script_pubkey_hex": P2MS_LOCKING_SCRIPT_HEX,
+            }],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["api_version"] == "v1"
+    assert payload["script_type"] == "P2MS"
+    assert payload["input_index"] == 0
+    assert payload["sources"] == {
+        "script_sig": {
+            "transaction_txid": "949591ad468cef5c41656c0a502d9500671ee421fadb590fbc6373000039b693",
+            "index": 0,
+        },
+        "script_pubkey": {
+            "transaction_txid": "581d30e2a73a2db683ac2f15d53590bd0cd72de52555c2722d9d6a78e9fea510",
+            "index": 0,
+        },
+    }
+    assert payload["scripts"]["locking"] == P2MS_LOCKING_SCRIPT_HEX
+    assert payload["scripts"]["combined"] == payload["trace"]["script"]
+    assert payload["multisig"]["required_signatures"] == 2
+    assert payload["multisig"]["total_public_keys"] == 3
+    assert len(payload["multisig"]["signatures"]) == 2
+    assert len(payload["multisig"]["public_keys"]) == 3
+    assert payload["multisig"]["has_null_dummy"] is True
+    assert payload["trace"]["success"] is True
+    assert [step["opcode"]["name"] for step in payload["trace"]["steps"]] == [
+        "OP_0",
+        "OP_PUSHBYTES_72",
+        "OP_PUSHBYTES_72",
+        "OP_2",
+        "OP_PUSHBYTES_65",
+        "OP_PUSHBYTES_65",
+        "OP_PUSHBYTES_65",
+        "OP_3",
+        "OP_CHECKMULTISIG",
+    ]
+
+
+async def test_p2ms_endpoint_rejects_a_p2sh_multisig_output_without_mislabeling_it():
+    response = await api_request(
+        "POST",
+        "/api/v1/traces/p2ms",
+        json={
+            "transaction_hex": P2MS_TRANSACTION_HEX,
+            "input_index": 0,
+            "spent_outputs": [{
+                "amount_sats": 1_690_000,
+                "script_pubkey_hex": "a914" + "11" * 20 + "87",
+            }],
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"] == {
+        "code": "unsupported-script-type",
+        "message": "Selected spent output is not a legacy bare P2MS script",
+    }
 
 
 async def test_invalid_signature_is_a_normal_failure_trace():
@@ -340,6 +426,10 @@ async def test_openapi_publishes_versioned_trace_contract():
     witness_operation = document["paths"]["/api/v1/traces/p2wpkh"]["post"]
     assert witness_operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
         "/P2WPKHTraceResponse"
+    )
+    multisig_operation = document["paths"]["/api/v1/traces/p2ms"]["post"]
+    assert multisig_operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
+        "/P2MSTraceResponse"
     )
     verification_operation = document["paths"]["/api/v1/signatures/ecdsa/verify"]["post"]
     assert verification_operation["responses"]["200"]["content"]["application/json"]["schema"][

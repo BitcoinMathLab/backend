@@ -13,6 +13,7 @@ HexString = Annotated[
 SpendTypeName = Literal[
     "P2PK",
     "P2PKH",
+    "P2MS",
     "P2SH",
     "P2SH-P2WPKH",
     "P2SH-P2WSH",
@@ -141,6 +142,24 @@ class P2PKHTraceResponse(APIModel):
     scripts: ScriptPairResponse
     sources: TraceSourcesResponse
     signature: SignatureVerificationResponse
+    trace: ExecutionTraceResponse
+
+
+class P2MSMetadataResponse(APIModel):
+    required_signatures: int = Field(ge=1, le=16)
+    total_public_keys: int = Field(ge=1, le=16)
+    signatures: list[str] = Field(min_length=1, max_length=16)
+    public_keys: list[str] = Field(min_length=1, max_length=16)
+    has_null_dummy: bool
+
+
+class P2MSTraceResponse(APIModel):
+    api_version: Literal["v1"] = "v1"
+    script_type: Literal["P2MS"] = "P2MS"
+    input_index: int = Field(ge=0)
+    scripts: ScriptPairResponse
+    sources: TraceSourcesResponse
+    multisig: P2MSMetadataResponse
     trace: ExecutionTraceResponse
 
 

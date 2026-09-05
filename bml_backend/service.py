@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from src.script import (
     ECDSASignatureVerificationResult,
+    P2MSTraceResult,
     P2PKHTraceResult,
     P2WPKHTraceResult,
     get_legacy_sighash,
@@ -12,6 +13,7 @@ from src.script import (
     get_segwit_sighash,
     get_segwit_sighash_preimage,
     trace_p2pkh_spend,
+    trace_p2ms_spend,
     trace_p2wpkh_spend,
     verify_ecdsa_sig,
     verify_input_ecdsa_signature,
@@ -24,6 +26,8 @@ from bml_backend.models import (
     ECDSASignatureVerificationResponse,
     ExecutionTraceResponse,
     OpcodeResponse,
+    P2MSMetadataResponse,
+    P2MSTraceResponse,
     P2PKHTraceRequest,
     P2PKHTraceResponse,
     P2WPKHScriptsResponse,
@@ -119,6 +123,34 @@ def _result_response(result: P2PKHTraceResult, tx: Tx) -> P2PKHTraceResponse:
             ),
         ),
         signature=_signature_response(result, tx),
+        trace=_trace_response(result.trace),
+    )
+
+
+def _p2ms_result_response(result: P2MSTraceResult, tx: Tx) -> P2MSTraceResponse:
+    return P2MSTraceResponse(
+        input_index=result.input_index,
+        scripts=ScriptPairResponse(
+            unlocking=result.unlocking_script.hex(),
+            locking=result.locking_script.hex(),
+            combined=result.combined_script.hex(),
+        ),
+        sources=TraceSourcesResponse(
+            script_sig=ScriptSourceResponse(
+                transaction_txid=tx.txid[::-1].hex(), index=result.input_index
+            ),
+            script_pubkey=ScriptSourceResponse(
+                transaction_txid=tx.inputs[result.input_index].txid[::-1].hex(),
+                index=tx.inputs[result.input_index].vout,
+            ),
+        ),
+        multisig=P2MSMetadataResponse(
+            required_signatures=result.required_signatures,
+            total_public_keys=len(result.public_keys),
+            signatures=[signature.hex() for signature in result.signatures],
+            public_keys=[public_key.hex() for public_key in result.public_keys],
+            has_null_dummy=result.null_dummy == b"",
+        ),
         trace=_trace_response(result.trace),
     )
 
@@ -438,3 +470,57 @@ def execute_p2wpkh_trace(request: P2PKHTraceRequest) -> P2WPKHTraceResponse:
         ),
         trace=_trace_response(result.trace),
     )
+
+
+def execute_p2ms_trace(request: P2PKHTraceRequest) -> P2MSTraceResponse:
+    raw_transaction = bytes.fromhex(request.transaction_hex)
+    try:
+        tx = Tx.from_bytes(raw_transaction)
+    except Exception as exc:
+        raise TraceRequestError(
+            "invalid-transaction",
+            "transaction_hex is not a complete serialized Bitcoin transaction.",
+        ) from exc
+    if tx.to_bytes() != raw_transaction:
+        raise TraceRequestError(
+            "invalid-transaction",
+            "transaction_hex contains trailing or non-canonical transaction data.",
+        )
+    if request.input_index >= len(tx.inputs):
+        raise TraceRequestError(
+            "input-index-out-of-range",
+            "input_index does not identify an input in the transaction.",
+        )
+    if len(request.spent_outputs) != len(tx.inputs):
+        raise TraceRequestError(
+            "spent-output-count",
+            "spent_outputs must contain exactly one item for every transaction input.",
+        )
+
+    spent_outputs = [
+        UTXO(
+            outpoint=tx.inputs[index].outpoint,
+            amount=descriptor.amount_sats,
+            scriptpubkey=bytes.fromhex(descriptor.script_pubkey_hex),
+            block_height=0,
+        )
+        for index, descriptor in enumerate(request.spent_outputs)
+    ]
+    try:
+        result = trace_p2ms_spend(tx, request.input_index, spent_outputs)
+    except ValueError as exc:
+        message = str(exc)
+        if "not a legacy bare P2MS" in message:
+            code = "unsupported-script-type"
+        elif "P2MS scriptSig" in message:
+            code = "invalid-unlocking-script"
+        else:
+            code = "invalid-spend-context"
+        raise TraceRequestError(code, message) from exc
+    except Exception as exc:
+        raise TraceRequestError(
+            "execution-error",
+            "Bitclone could not execute the supplied P2MS spend context.",
+        ) from exc
+
+    return _p2ms_result_response(result, tx)

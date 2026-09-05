@@ -1,4 +1,4 @@
-# P2PKH and P2WPKH Trace API
+# P2PKH, P2WPKH, and P2MS Trace API
 
 ## Endpoint
 
@@ -8,6 +8,10 @@
 `scriptSig` must be empty and its witness must contain exactly the DER signature/hash-type item and compressed public
 key. The trace begins with those real witness items on the stack and executes the P2PKH `scriptCode` derived from the
 20-byte witness program.
+
+`POST /api/v1/traces/p2ms` accepts the same request shape and validates one legacy bare P2MS input. The spent output
+must be a direct m-of-n multisig scriptPubKey rather than a P2SH wrapper. The scriptSig must contain the historical
+empty CHECKMULTISIG dummy followed by the serialized signatures.
 
 ```json
 {
@@ -23,7 +27,8 @@ key. The trace begins with those real witness items on the stack and executes th
 ```
 
 `spent_outputs` must contain exactly one descriptor for every transaction input, in input order. The selected spent
-output must be legacy P2PKH and the selected transaction input must contain a P2PKH scriptSig.
+output must match the endpoint's script family and the selected transaction input must contain that family's expected
+scriptSig or witness structure.
 
 ## Success and script failure
 
@@ -43,6 +48,11 @@ public transaction data and is suitable for an educational byte walkthrough.
 For P2WPKH, the response additionally exposes the witness items, witness program, derived serialized `scriptCode`,
 spent amount, `hashPrevouts`, `hashSequence`, and `hashOutputs`. The preimage and digest follow BIP143 and respect the
 selected `SIGHASH` and `ANYONECANPAY` commitments.
+
+For P2MS, the response exposes the unlocking, locking, and combined scripts; required signature count; total public
+key count; ordered serialized signatures and public keys; NULLDUMMY presence; and the real combined-script execution
+trace through `OP_CHECKMULTISIG`. This endpoint does not provide a per-signature sighash walkthrough. Consumers must
+label that boundary explicitly rather than presenting P2PKH verification data for a multisig spend.
 
 Normal failures use `trace.success: false`. This lets the visualizer teach a failed signature or script without treating
 the lesson itself as a failed HTTP request.

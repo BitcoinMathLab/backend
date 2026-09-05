@@ -24,6 +24,7 @@ from bml_backend.models import (
     ErrorResponse,
     P2PKHTraceRequest,
     P2PKHTraceResponse,
+    P2MSTraceResponse,
     P2WPKHTraceResponse,
     PreviousOutputResponse,
     StandardScriptTemplateRequest,
@@ -42,6 +43,7 @@ from bml_backend.service import (
     TraceRequestError,
     execute_ecdsa_signature_verification,
     execute_p2pkh_trace,
+    execute_p2ms_trace,
     execute_p2wpkh_trace,
 )
 from bml_backend.transaction_examples import TRANSACTION_EXAMPLES
@@ -112,6 +114,10 @@ async def p2pkh_trace(request: P2PKHTraceRequest) -> P2PKHTraceResponse:
 
 async def p2wpkh_trace(request: P2PKHTraceRequest) -> P2WPKHTraceResponse:
     return execute_p2wpkh_trace(request)
+
+
+async def p2ms_trace(request: P2PKHTraceRequest) -> P2MSTraceResponse:
+    return execute_p2ms_trace(request)
 
 
 async def verify_ecdsa_signature(
@@ -342,6 +348,14 @@ def create_app(
         p2wpkh_trace,
         methods=["POST"],
         response_model=P2WPKHTraceResponse,
+        responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+        tags=["traces"],
+    )
+    application.add_api_route(
+        "/api/v1/traces/p2ms",
+        p2ms_trace,
+        methods=["POST"],
+        response_model=P2MSTraceResponse,
         responses={422: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
         tags=["traces"],
     )
