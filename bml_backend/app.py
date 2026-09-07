@@ -10,14 +10,15 @@ from time import perf_counter
 from urllib.parse import urlsplit
 from uuid import uuid4
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Path, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from bml_backend import __version__
 from bml_backend.bitcoin_core import TransactionContextSource, TransactionSourceError
-from bml_backend.config import transaction_source_from_environment
+from bml_backend.config import block_source_from_environment, transaction_source_from_environment
+from bml_backend.blocks import BlockResponse, BlockSource
 from bml_backend.models import (
     ECDSASignatureVerificationRequest,
     ECDSASignatureVerificationResponse,
@@ -87,6 +88,8 @@ async def transaction_source_error_handler(
 ) -> JSONResponse:
     status_code = {
         "invalid-txid": 422,
+        "invalid-block-hash": 422,
+        "request-validation": 422,
         "bitcoin-core-not-configured": 503,
         "bitcoin-core-unavailable": 503,
         "invalid-source-data": 502,
@@ -211,6 +214,7 @@ def create_app(
     cors_origins: Sequence[str] | None = None,
     release: str | None = None,
     transaction_source: TransactionContextSource | None | object = _ENVIRONMENT_SOURCE,
+    block_source: BlockSource | None | object = _ENVIRONMENT_SOURCE,
 ) -> FastAPI:
     application = FastAPI(
         title="Bitcoin Math Lab API",
@@ -232,6 +236,43 @@ def create_app(
         if transaction_source is _ENVIRONMENT_SOURCE
         else transaction_source
     )
+
+    configured_block_source = (
+        block_source_from_environment()
+        if block_source is _ENVIRONMENT_SOURCE
+        else block_source
+    )
+
+    def load_block(identifier: str | int, offset: int, limit: int) -> BlockResponse:
+        if configured_block_source is None:
+            raise TransactionSourceError(
+                "bitcoin-core-not-configured", "Bitcoin Core block lookup is not configured."
+            )
+        return configured_block_source.load_block(identifier, offset, limit)
+
+    def block_by_hash(
+        block_hash: str = Path(pattern=r"^[0-9a-fA-F]{64}$"),
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=25, ge=1, le=100),
+    ) -> BlockResponse:
+        return load_block(block_hash, offset, limit)
+
+    def block_by_height(
+        height: int = Path(ge=0),
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=25, ge=1, le=100),
+    ) -> BlockResponse:
+        return load_block(height, offset, limit)
+
+    for path, endpoint in (
+        ("/api/v1/blocks/height/{height}", block_by_height),
+        ("/api/v1/blocks/{block_hash}", block_by_hash),
+    ):
+        application.add_api_route(
+            path, endpoint, methods=["GET"], response_model=BlockResponse,
+            responses={code: {"model": ErrorResponse} for code in (422, 502, 503)},
+            tags=["blocks"],
+        )
 
     async def configured_health() -> dict[str, str]:
         response = {"status": "ok", "version": __version__}

@@ -55,6 +55,12 @@ the explorer, including their expected input/output shapes and spend classificat
 `POST /api/v1/scripts/templates` builds validated P2SH, P2WPKH, P2WSH, and Taproot locking scripts and mainnet
 addresses from their committed hash or output-key programs.
 
+## Block lookup
+
+The same Core connection supports `GET /api/v1/blocks/{block_hash}` and
+`GET /api/v1/blocks/height/{height}`, with metadata and paginated transaction IDs.
+See [the block API contract and review steps](docs/blocks-api.md).
+
 ## Runtime configuration
 
 The service is safe to run without browser cross-origin access. When the frontend and API use different origins, set

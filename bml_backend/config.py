@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 from src.database.bitcoin_core_rpc import BitcoinCoreRPC
 
 from bml_backend.bitcoin_core import BitcoinCoreTransactionSource
+from bml_backend.blocks import BitcoinCoreBlockSource
 
 
 CORE_VARIABLES = (
@@ -19,9 +20,9 @@ CORE_VARIABLES = (
 )
 
 
-def transaction_source_from_environment(
+def core_client_from_environment(
     environment: Mapping[str, str] | None = None,
-) -> BitcoinCoreTransactionSource | None:
+) -> BitcoinCoreRPC | None:
     """Create the optional Bitcoin Core source, failing fast on partial configuration."""
     values = os.environ if environment is None else environment
     configured = {name: values.get(name, "") for name in CORE_VARIABLES}
@@ -65,4 +66,14 @@ def transaction_source_from_environment(
         cookie_file=cookie,
         timeout=timeout,
     )
-    return BitcoinCoreTransactionSource(client)
+    return client
+
+
+def transaction_source_from_environment(environment: Mapping[str, str] | None = None) -> BitcoinCoreTransactionSource | None:
+    client = core_client_from_environment(environment)
+    return BitcoinCoreTransactionSource(client) if client is not None else None
+
+
+def block_source_from_environment(environment: Mapping[str, str] | None = None) -> BitcoinCoreBlockSource | None:
+    client = core_client_from_environment(environment)
+    return BitcoinCoreBlockSource(client) if client is not None else None
