@@ -47,3 +47,18 @@ Try `limit=101` (422), then stop/disconnect Core and retry (503).
 
 This slice adds the API only. Display loading and Explorer navigation remain separate
 review steps; there are no changed browser layouts to inspect.
+
+
+Block details also include `target_hex` (64 lowercase hex digits, big-endian,
+expanded from header bits) and nullable `money`:
+
+- `subsidy_sats`: network subsidy, excluding fees.
+- `fees_sats`: total fees in the whole block.
+- `transaction_output_sats`: sum of non-coinbase transaction outputs, including
+  change and self-transfers; this is not economic payment volume.
+
+Amounts are decimal strings to preserve integer precision in JavaScript. All
+pages report the same whole-block totals. These come from Bitcoin Core
+[`getblockstats`](https://bitcoincore.org/en/doc/30.0.0/rpc/blockchain/getblockstats/).
+If historical statistics are unavailable or invalid, `money` is null while the
+block metadata and transaction IDs remain available. No amounts are inferred.

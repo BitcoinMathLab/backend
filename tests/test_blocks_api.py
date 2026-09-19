@@ -30,9 +30,14 @@ def block_data():
                 nTx=len(TXIDS), tx=TXIDS, previousblockhash='ef' * 32)
 
 
+def stats_data(**patch):
+    return dict(blockhash=BLOCK_HASH, height=100, subsidy=5000000000,
+                totalfee=12345, total_out=9007199254740993) | patch
+
+
 def setup_client(data=None):
     rpc = Mock()
-    rpc.call.return_value = block_data() if data is None else data
+    rpc.call.side_effect = lambda method, *args: (stats_data() if method == "getblockstats" else (block_data() if data is None else data))
     source = BitcoinCoreBlockSource(rpc)
     return rpc, api_client(create_app(transaction_source=None, block_source=source))
 
@@ -49,7 +54,11 @@ async def test_hash_lookup_normalizes_and_returns_metadata_without_transaction_f
     assert data['previous_block_hash'] == 'ef' * 32
     assert data['next_block_hash'] is None
     assert data['weight_units'] == 1140
-    rpc.call.assert_called_once_with('getblock', BLOCK_HASH, 1)
+    assert data['target_hex'] == '00000000ffff0000000000000000000000000000000000000000000000000000'
+    assert data['money'] == dict(subsidy_sats='5000000000', fees_sats='12345',
+                                 transaction_output_sats='9007199254740993')
+    assert rpc.call.call_args_list[0].args == ('getblock', BLOCK_HASH, 1)
+    assert rpc.call.call_count == 2
 
 
 async def test_height_lookup_and_genesis_missing_links():
@@ -57,7 +66,7 @@ async def test_height_lookup_and_genesis_missing_links():
     block.update(height=0, nTx=1, tx=TXIDS[:1])
     del block['previousblockhash']
     rpc, client = setup_client()
-    rpc.call.side_effect = [BLOCK_HASH, block]
+    rpc.call.side_effect = [BLOCK_HASH, block, stats_data(height=0)]
     response = await client.get('/api/v1/blocks/height/0')
     assert response.status_code == 200
     assert response.json()['previous_block_hash'] is None
@@ -125,3 +134,15 @@ async def test_unconfigured_core_and_openapi_contract():
     assert response.status_code == 503
     assert response.json()['error']['code'] == 'bitcoin-core-not-configured'
     assert '/api/v1/blocks/{block_hash}' in (await client.get('/api/v1/openapi.json')).json()['paths']
+
+
+@pytest.mark.parametrize('stats', [stats_data(blockhash='00' * 32), stats_data(height=99),
+                                  stats_data(totalfee=-1), stats_data(total_out=1.5),
+                                  BitcoinCoreRPCError('private stats failure')])
+async def test_unavailable_or_invalid_stats_preserve_block_without_fake_amounts(stats):
+    rpc, client = setup_client()
+    rpc.call.side_effect = [block_data(), stats]
+    response = await client.get(f'/api/v1/blocks/{BLOCK_HASH}')
+    assert response.status_code == 200
+    assert response.json()['money'] is None
+    assert 'private' not in response.text
